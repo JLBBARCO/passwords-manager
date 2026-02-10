@@ -1,0 +1,1 @@
+python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico main.py
