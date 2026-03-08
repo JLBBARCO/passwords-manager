@@ -15,10 +15,6 @@ class RemovePassword:
             with open(self.json_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Verifica o formato dos dados
-            passwords_list = self._get_passwords_list(data)
-            initial_len = len(passwords_list)
-            
             # Remove a entrada baseada em address e user
             address_stripped = address.strip()
             user_stripped = user.strip()
@@ -62,14 +58,6 @@ class RemovePassword:
         except Exception as e:
             print(f'Error removing password: {str(e)}')
             return False
-    
-    def _get_passwords_list(self, data):
-        """Extrai a lista de senhas do dado carregado"""
-        if isinstance(data, list):
-            return data
-        elif isinstance(data, dict) and 'passwords' in data:
-            return data['passwords']
-        return []
     
     def _get_field(self, entry, field_name):
         """Obtém um campo do dicionário, tentando variações de capitalização"""

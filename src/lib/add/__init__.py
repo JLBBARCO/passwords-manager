@@ -1,10 +1,11 @@
-import pandas as pd
 import json
 import os
+from src.lib.crypto import get_crypto_manager
 
 class AddPassword:
     def __init__(self):
         self.json_file = 'passwords.json'
+        self.crypto = get_crypto_manager()
     
     def add_password(self, address, user, password):
         """Add a new password in JSON file if not exist"""
@@ -14,41 +15,40 @@ class AddPassword:
                     data = json.load(file)
             else:
                 data = []
-            
-            df = pd.DataFrame(data)
-            
-            if df.empty:
-                df = pd.DataFrame(columns=['Address', 'User', 'Password'])
-            elif 'Address' not in df.columns:
-                df = pd.DataFrame(columns=['Address', 'User', 'Password'])
-            
-            if not df.empty:
-                df['Address'] = df['Address'].str.strip()
-                df['User'] = df['User'].str.strip()
-                df['Password'] = df['Password'].str.strip()
+
+            if isinstance(data, dict) and 'passwords' in data:
+                passwords = data['passwords']
+            elif isinstance(data, list):
+                passwords = data
+            else:
+                passwords = []
             
             address_stripped = address.strip()
             user_stripped = user.strip()
             password_stripped = password.strip()
             
-            if not df.empty:
-                existing = df[
-                    (df['Address'] == address_stripped) & 
-                    (df['User'] == user_stripped) & 
-                    (df['Password'] == password_stripped)
-                ]
-                
-                if not existing.empty:
+            # Criptografa a senha antes de salvar
+            encrypted_password = self.crypto.encrypt_password(password_stripped)
+
+            # Verifica se já existe com o mesmo endereço e usuário
+            for entry in passwords:
+                entry_address = str(entry.get('Address', entry.get('address', ''))).strip()
+                entry_user = str(entry.get('User', entry.get('user', ''))).strip()
+                if entry_address == address_stripped and entry_user == user_stripped:
                     return False
             
             new_entry = {
                 'Address': address_stripped,
                 'User': user_stripped,
-                'Password': password_stripped
+                'Password': encrypted_password  # Salva a senha criptografada
             }
-            
-            data = df.to_dict('records')
-            data.append(new_entry)
+
+            passwords.append(new_entry)
+
+            if isinstance(data, dict) and 'passwords' in data:
+                data['passwords'] = passwords
+            else:
+                data = passwords
             
             with open(self.json_file, 'w', encoding='utf-8') as file:
                 json.dump(data, file, indent=2, ensure_ascii=False)

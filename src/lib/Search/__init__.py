@@ -1,5 +1,6 @@
 import json
 import os
+from src.lib.crypto import get_crypto_manager
 
 
 class Search:
@@ -10,6 +11,7 @@ class Search:
         self.query = (query or '').strip()
         self.json_file = json_file
         self.results = []
+        self.crypto = get_crypto_manager()
         self.search_passwords()
 
     def search_passwords(self):
@@ -32,15 +34,18 @@ class Search:
                 user = self._get_field(entry, 'User').strip()
                 pwd = self._get_field(entry, 'Password').strip()
                 
+                # Descriptografa a senha antes de usar
+                pwd_decrypted = self.crypto.decrypt_password(pwd)
+                
                 if q == '':
                     # Se query vazia, retorna todos
-                    self.results.append((addr, user, pwd))
+                    self.results.append((addr, user, pwd_decrypted))
                 else:
-                    # Procura a query em qualquer campo
+                    # Procura a query em qualquer campo (incluindo senha descriptografada)
                     if (q in addr.lower() or 
                         q in user.lower() or 
-                        q in pwd.lower()):
-                        self.results.append((addr, user, pwd))
+                        q in pwd_decrypted.lower()):
+                        self.results.append((addr, user, pwd_decrypted))
                         
         except json.JSONDecodeError as e:
             print(f"Error parsing JSON file: {e}")
