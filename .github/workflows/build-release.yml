@@ -213,6 +213,6 @@ jobs:
             artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz
             artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz
           draft: false
-          prerelease: ${{ steps.version.outputs.version == 'latest' }}
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
