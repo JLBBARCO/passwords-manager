@@ -1,231 +1,206 @@
 name: Build and Release
 
 on:
-    push:
-        branches:
-            - main
-            - criptograph
-        tags:
-            - "v*"
-    workflow_dispatch:
+  push:
+    branches:
+      - main
+      - criptograph
+    tags:
+      - "v*"
+  workflow_dispatch:
 
 jobs:
-    build-windows:
-        runs-on: windows-latest
+  build-windows:
+    runs-on: windows-latest
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-            - name: Install dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  pip install -r requirements.txt
-                  pip install pyinstaller
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-            - name: Build executable
-              run: |
-                  python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=passwords-manager main.py
+      - name: Build executable
+        run: |
+          python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=passwords-manager main.py
 
-            - name: Prepare release files
-              run: |
-                  mkdir release
-                  copy dist\passwords-manager.exe release\
-                  copy README.md release\
-                  copy LICENSE release\
-                  copy ENCRYPTION.md release\ 2>nul || copy CRIPTOGRAFIA.md release\
+      - name: Prepare release files
+        run: |
+          mkdir release
+          copy dist\passwords-manager.exe release\
+          copy README.md release\
+          copy LICENSE release\
+          copy ENCRYPTION.md release\ 2>nul || copy CRIPTOGRAFIA.md release\
 
-            - name: Create ZIP archive
-              run: |
-                  Compress-Archive -Path release\* -DestinationPath passwords-manager-windows.zip
+      - name: Create ZIP archive
+        run: |
+          Compress-Archive -Path release\* -DestinationPath passwords-manager-windows.zip
 
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: passwords-manager-windows
-                  path: passwords-manager-windows.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: passwords-manager-windows
+          path: passwords-manager-windows.zip
 
-            - name: Get version info
-              id: version
-              shell: bash
-              run: |
-                  if [[ $GITHUB_REF == refs/tags/* ]]; then
-                    VERSION=${GITHUB_REF#refs/tags/}
-                  else
-                    VERSION="latest"
-                  fi
-                  echo "version=$VERSION" >> $GITHUB_OUTPUT
-                  echo "Building version: $VERSION"
+  build-linux:
+    runs-on: ubuntu-latest
 
-            - name: Create or Update Release
-              uses: softprops/action-gh-release@v1
-              with:
-                  tag_name: ${{ steps.version.outputs.version }}
-                  name: ${{ steps.version.outputs.version == 'latest' && 'Latest Development Build' || steps.version.outputs.version }}
-                  body: |
-                      ## 🔐 Password Manager - ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-                      ### 📥 Download
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-                      Download the `passwords-manager-windows.zip` file, extract it and run `passwords-manager.exe`.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-                      ### ✨ Features
+      - name: Build executable
+        run: |
+          python -m PyInstaller --onefile --noconsole --name=passwords-manager main.py
 
-                      - ✅ Secure password management
-                      - 🔐 Automatic AES encryption
-                      - 🔄 Automatic migration of old files
-                      - 🔍 Integrated search system
-                      - 🎲 Simple and complex password generator
+      - name: Prepare release files
+        run: |
+          mkdir release
+          cp dist/passwords-manager release/
+          cp README.md release/
+          cp LICENSE release/
+          cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/
+          chmod +x release/passwords-manager
 
-                      ### ⚠️ Important
+      - name: Create TAR.GZ archive
+        run: |
+          cd release
+          tar -czf ../passwords-manager-linux.tar.gz *
+          cd ..
 
-                      - **Keep the `encryption.key` file in a safe location!**
-                      - See `README.md` and `ENCRYPTION.md` for more information
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: passwords-manager-linux
+          path: passwords-manager-linux.tar.gz
 
-                      ### 📝 Changelog
+  build-macos:
+    runs-on: macos-latest
 
-                      Automatic build generated from commit: ${{ github.sha }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-                      ---
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-                      **Data de Build:** ${{ github.event.head_commit.timestamp }}
-                      **Branch:** ${{ github.ref_name }}
-                  files: |
-                      passwords-manager-windows.zip
-                  draft: false
-                  prerelease: ${{ steps.version.outputs.version == 'latest' }}
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-    build-linux:
-        runs-on: ubuntu-latest
+      - name: Build executable
+        run: |
+          python -m PyInstaller --onefile --noconsole --name=passwords-manager main.py
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+      - name: Prepare release files
+        run: |
+          mkdir release
+          cp dist/passwords-manager release/
+          cp README.md release/
+          cp LICENSE release/
+          cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/
+          chmod +x release/passwords-manager
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
+      - name: Create TAR.GZ archive
+        run: |
+          cd release
+          tar -czf ../passwords-manager-macos.tar.gz *
+          cd ..
 
-            - name: Install dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  pip install -r requirements.txt
-                  pip install pyinstaller
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: passwords-manager-macos
+          path: passwords-manager-macos.tar.gz
 
-            - name: Build executable
-              run: |
-                  python -m PyInstaller --onefile --noconsole --name=passwords-manager main.py
+  create-release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
 
-            - name: Prepare release files
-              run: |
-                  mkdir release
-                  cp dist/passwords-manager release/
-                  cp README.md release/
-                  cp LICENSE release/
-                  cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/
-                  chmod +x release/passwords-manager
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Create TAR.GZ archive
-              run: |
-                  cd release
-                  tar -czf ../passwords-manager-linux.tar.gz *
-                  cd ..
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: passwords-manager-linux
-                  path: passwords-manager-linux.tar.gz
+      - name: Get version info
+        id: version
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="latest"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
 
-            - name: Get version info
-              id: version
-              run: |
-                  if [[ $GITHUB_REF == refs/tags/* ]]; then
-                    VERSION=${GITHUB_REF#refs/tags/}
-                  else
-                    VERSION="latest"
-                  fi
-                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version == 'latest' && 'Latest Development Build' || steps.version.outputs.version }}
+          body: |
+            ## 🔐 Password Manager - ${{ steps.version.outputs.version }}
 
-            - name: Update Release with Linux build
-              uses: softprops/action-gh-release@v1
-              with:
-                  tag_name: ${{ steps.version.outputs.version }}
-                  files: |
-                      passwords-manager-linux.tar.gz
+            ### Download
 
-                      build-macos:
-                          runs-on: macos-latest
+            - **Windows**: `passwords-manager-windows.zip`
+            - **Linux**: `passwords-manager-linux.tar.gz`
+            - **macOS**: `passwords-manager-macos.tar.gz`
 
-                          steps:
-                              - name: Checkout code
-                                uses: actions/checkout@v4
+            ### Features
 
-                              - name: Set up Python
-                                uses: actions/setup-python@v5
-                                with:
-                                    python-version: "3.11"
+            - ✅ Secure password management
+            - 🔐 Automatic AES encryption
+            - 🔄 Automatic migration of old files
+            - 🔍 Integrated search system
+            - 🎲 Simple and complex password generator
 
-                              - name: Install dependencies
-                                run: |
-                                    python -m pip install --upgrade pip
-                                    pip install -r requirements.txt
-                                    pip install pyinstaller
+            ### Important
 
-                              - name: Build executable
-                                run: |
-                                    python -m PyInstaller --onefile --windowed --name=passwords-manager main.py
+            - **Keep the `encryption.key` file in a safe location!**
+            - See `README.md` and `ENCRYPTION.md` for more information
 
-                              - name: Prepare release files
-                                run: |
-                                    mkdir release
-                                    cp dist/passwords-manager release/
-                                    cp README.md release/
-                                    cp LICENSE release/
-                                    cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/
-                                    chmod +x release/passwords-manager
+            ### Changelog
 
-                              - name: Create TAR.GZ archive
-                                run: |
-                                    cd release
-                                    tar -czf ../passwords-manager-macos.tar.gz *
-                                    cd ..
+            Automatic build generated from commit: ${{ github.sha }}
 
-                              - name: Upload artifact
-                                uses: actions/upload-artifact@v4
-                                with:
-                                    name: passwords-manager-macos
-                                    path: passwords-manager-macos.tar.gz
+            ---
 
-                              - name: Get version info
-                                id: version
-                                run: |
-                                    if [[ $GITHUB_REF == refs/tags/* ]]; then
-                                      VERSION=${GITHUB_REF#refs/tags/}
-                                    else
-                                      VERSION="latest"
-                                    fi
-                                    echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-                              - name: Update Release with macOS build
-                                uses: softprops/action-gh-release@v1
-                                with:
-                                    tag_name: ${{ steps.version.outputs.version }}
-                                    files: |
-                                        passwords-manager-macos.tar.gz
-                                    draft: false
-                                    prerelease: ${{ steps.version.outputs.version == 'latest' }}
-                                env:
-                                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  draft: false
-                  prerelease: ${{ steps.version.outputs.version == 'latest' }}
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            **Build Date:** ${{ github.event.head_commit.timestamp || 'n/a' }}
+            **Branch:** ${{ github.ref_name }}
+          files: |
+            artifacts/passwords-manager-windows/passwords-manager-windows.zip
+            artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz
+            artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz
+          draft: false
+          prerelease: ${{ steps.version.outputs.version == 'latest' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
