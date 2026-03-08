@@ -1,23 +1,53 @@
-import pandas as pd
+import csv
 import json
+import os
+from src.lib.crypto import get_crypto_manager
 
 def convertToCSV():
-    # Read CSV
-    csvArchive = pd.read_csv('passwords.csv', sep=';')
+    """
+    Converte CSV para JSON com criptografia de senhas.
+    Retorna True se bem-sucedido, False caso contrário.
+    Exclui o arquivo CSV após conversão bem-sucedida.
+    """
+    try:
+        csv_file = 'passwords.csv'
+        json_file = 'passwords.json'
+        
+        if not os.path.exists(csv_file):
+            print(f"Arquivo {csv_file} não encontrado.")
+            return False
+        
+        # Inicializa o gerenciador de criptografia
+        crypto = get_crypto_manager()
+        
+        # Read CSV and convert to list of dictionaries with encrypted passwords
+        data = []
+        with open(csv_file, 'r', encoding='utf-8', newline='') as csv_input:
+            reader = csv.DictReader(csv_input, delimiter=';')
+            for row in reader:
+                encrypted_password = crypto.encrypt_password(str(row.get("Passwords", "")))
+                entry = {
+                    "Address": str(row.get("Address", "")),
+                    "User": str(row.get("User", "")),
+                    "Password": encrypted_password,
+                }
+                data.append(entry)
 
-    # Convert to list of dictionaries
-    data = []
-    for _, row in csvArchive.iterrows():
-        entry = {
-            "Address": row["Address"],
-            "User": row["User"],
-            "Password": row["Passwords"]
-        }
-        data.append(entry)
+        # Write to JSON file with encrypted passwords
+        with open(json_file, 'w', encoding='utf-8') as jsonFile:
+            json.dump(data, jsonFile, indent=2, ensure_ascii=False)
 
-    # Write to JSON file
-    with open('passwords.json', 'w') as jsonFile:
-        json.dump(data, jsonFile, indent=4)
-
-    # Print JSON string
-    print(json.dumps(data, indent=4))
+        print(f"✓ Conversão concluída: {len(data)} senha(s) convertida(s) e criptografadas.")
+        
+        # Exclui o arquivo CSV após conversão bem-sucedida
+        try:
+            os.remove(csv_file)
+            print(f"✓ Arquivo {csv_file} excluído com sucesso.")
+        except Exception as e:
+            print(f"⚠ Aviso: Não foi possível excluir {csv_file}: {e}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"✗ Erro ao converter CSV para JSON: {e}")
+        return False

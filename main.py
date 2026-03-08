@@ -1,4 +1,5 @@
 ﻿import customtkinter as ctk
+import tkinter as tk
 from src.lib.read_passwords import PasswordLoader
 from src.lib.type_window import TypeWindow
 
@@ -24,8 +25,42 @@ class App(ctk.CTk):
         self.SearchButton = ctk.CTkButton(self.main_frame, text='Search', command=self.search)
         self.SearchButton.grid(row=1, column=2, pady=padMain)
 
-        self.showTable = ctk.CTkScrollableFrame(self.main_frame, width=500, height=100)
-        self.showTable.grid(row=2, column=0, columnspan=3, padx=padMain, pady=padMain)
+        # Table area with both vertical and horizontal scrolling
+        self.table_container = ctk.CTkFrame(self.main_frame)
+        self.table_container.grid(row=2, column=0, columnspan=3, padx=padMain, pady=padMain, sticky="nsew")
+
+        # Use the same background color as the table frame to avoid white canvas gaps
+        table_bg = self._apply_appearance_mode(self.table_container.cget("fg_color"))
+        self.table_canvas = tk.Canvas(
+            self.table_container,
+            width=500,
+            height=120,
+            highlightthickness=0,
+            bd=0,
+            bg=table_bg,
+        )
+        self.table_canvas.grid(row=0, column=0, sticky="nsew")
+
+        self.table_scroll_y = ctk.CTkScrollbar(self.table_container, orientation="vertical",
+                               command=self.table_canvas.yview)
+        self.table_scroll_y.grid(row=0, column=1, sticky="ns")
+
+        self.table_scroll_x = ctk.CTkScrollbar(self.table_container, orientation="horizontal",
+                               command=self.table_canvas.xview)
+        self.table_scroll_x.grid(row=1, column=0, sticky="ew")
+
+        self.table_container.grid_rowconfigure(0, weight=1)
+        self.table_container.grid_columnconfigure(0, weight=1)
+
+        self.table_canvas.configure(yscrollcommand=self.table_scroll_y.set, xscrollcommand=self.table_scroll_x.set)
+
+        self.table_content = ctk.CTkFrame(self.table_canvas)
+        self.table_window_id = self.table_canvas.create_window((0, 0), window=self.table_content, anchor="nw")
+        self.table_content.bind("<Configure>", self._update_table_scrollregion)
+
+        # Keep compatibility with existing rendering code
+        self.showTable = self.table_content
+
         self.showTableTitleAddress = ctk.CTkLabel(self.showTable, text='Address')
         self.showTableTitleAddress.grid(row=0, column=0, padx=padMain, pady=padMain)
         self.showTableTitleUser = ctk.CTkLabel(self.showTable, text='User')
@@ -56,8 +91,25 @@ class App(ctk.CTk):
 
         self.check_loading_status()
 
+    def _update_table_scrollregion(self, _event=None):
+        self.table_canvas.configure(scrollregion=self.table_canvas.bbox("all"))
+
+    def _copy_table_value(self, value):
+        from src.lib.Copy import Copy
+        text = str(value)
+        if Copy.copy_to_clipboard(text):
+            self.status_var.set(f"Copied: {text}")
+        else:
+            self.status_var.set("Error copying value")
+
+    def _create_clickable_cell(self, row, column, value):
+        label = ctk.CTkLabel(self.showTable, text=str(value))
+        label.grid(row=row, column=column, padx=padMain, pady=padMain)
+        label.bind("<Button-1>", lambda _event, v=value: self._copy_table_value(v))
+        return label
+
     def check_loading_status(self):
-        if self.password_loader.loading_thread.is_alive():
+        if self.password_loader.loading_thread and self.password_loader.loading_thread.is_alive():
             self.after(100, self.check_loading_status)
         else:
             # Executa o callback na thread principal
@@ -80,18 +132,27 @@ class App(ctk.CTk):
             self.ShowError.grid(row=1, column=0, columnspan=3, padx=padMain, pady=padMain)
 
     def search(self):
-        from src.lib.Search import Search
-        search_obj = Search(self.SearchBar.get())
+        q = (self.SearchBar.get() or '').strip().lower()
         for widget in self.showTable.winfo_children()[3:]:
             widget.destroy()
-        if search_obj.results:
-            for idx, (addr, user, pwd) in enumerate(search_obj.results, start=1):
-                ctk.CTkLabel(self.showTable, text=addr).grid(row=idx, column=0, padx=padMain, pady=padMain)
-                ctk.CTkLabel(self.showTable, text=user).grid(row=idx, column=1, padx=padMain, pady=padMain)
-                ctk.CTkLabel(self.showTable, text=pwd).grid(row=idx, column=2, padx=padMain, pady=padMain)
-        else:
+
+        results = []
+        for record in self.password_loader.all_data:
+            addr = str(record.get('Address', record.get('address', ''))).strip()
+            user = str(record.get('User', record.get('user', ''))).strip()
+            pwd = str(record.get('Password', record.get('password', ''))).strip()
+            if not q or q in addr.lower() or q in user.lower() or q in pwd.lower():
+                results.append((addr, user, pwd))
+
+        if not results:
             ctk.CTkLabel(self.showTable, text='No results found').grid(
                 row=1, column=0, columnspan=3, padx=padMain, pady=padMain)
+            return
+
+        for idx, (addr, user, pwd) in enumerate(results, start=1):
+            self._create_clickable_cell(idx, 0, addr)
+            self._create_clickable_cell(idx, 1, user)
+            self._create_clickable_cell(idx, 2, pwd)
 
     def add(self):
         add_window = TypeWindow(TitleWindow='Add Password', Address=True, User=True, Password=True)
@@ -174,9 +235,9 @@ class App(ctk.CTk):
             return
         try:
             for idx, record in enumerate(self.password_loader.all_data, start=1):
-                ctk.CTkLabel(self.showTable, text=record['Address'].strip()).grid(row=idx, column=0, padx=padMain, pady=padMain)
-                ctk.CTkLabel(self.showTable, text=record['User'].strip()).grid(row=idx, column=1, padx=padMain, pady=padMain)
-                ctk.CTkLabel(self.showTable, text=record['Password'].strip()).grid(row=idx, column=2, padx=padMain, pady=padMain)
+                self._create_clickable_cell(idx, 0, record['Address'].strip())
+                self._create_clickable_cell(idx, 1, record['User'].strip())
+                self._create_clickable_cell(idx, 2, record['Password'].strip())
         except Exception as e:
             ctk.CTkLabel(self.showTable, text=f'Error: {str(e)}').grid(row=1, column=0, columnspan=3, padx=padMain, pady=padMain)
 

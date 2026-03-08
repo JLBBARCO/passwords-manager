@@ -1,7 +1,37 @@
+# VS Code
 .vscode/
+
+# Password files (sensitive data)
 passwords.csv
 passwords.json
+passwords_backup.json
+passwords_backup_unencrypted.json
+encryption.key
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# PyInstaller
 passwords_manager.spec
 build/
 dist/
+*.spec
+
+# Build outputs
+release/
+*.zip
+*.tar.gz
+*.exe
+*.app
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
