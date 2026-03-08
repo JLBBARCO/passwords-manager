@@ -121,6 +121,6 @@ This project uses GitHub Actions to automatically compile the program with each 
 
 ## 📚 Documentation
 
-- **[README.md](README.md)** - General documentation and usage guide
+- **[GITHUB_WORKFLOWS.md](.github/GITHUB_WORKFLOWS.md)** - General documentation and usage guide
 - **[ENCRYPTION.md](ENCRYPTION.md)** - Technical documentation of the encryption system
 - **[GITHUB_ACTIONS.md](GITHUB_ACTIONS.md)** - Documentation about automatic builds
