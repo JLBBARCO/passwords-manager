@@ -73,6 +73,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          # Install tkinter dependencies for Linux
+          sudo apt-get update
+          sudo apt-get install -y python3-tk xclip 2>/dev/null || true
 
       - name: Build executable
         run: |
@@ -84,7 +87,7 @@ jobs:
           cp dist/passwords-manager release/
           cp README.md release/
           cp LICENSE release/
-          cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/
+          cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/ 2>/dev/null || true
           chmod +x release/passwords-manager
 
       - name: Create TAR.GZ archive
@@ -130,7 +133,7 @@ jobs:
           cp dist/passwords-manager release/
           cp README.md release/
           cp LICENSE release/
-          cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/
+          cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/ 2>/dev/null || true
           chmod +x release/passwords-manager
 
       - name: Create TAR.GZ archive

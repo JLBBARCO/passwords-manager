@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import sys
 
 padMain = 10
 
@@ -8,8 +9,18 @@ class TypeWindow(ctk.CTkToplevel):
         self.title(TitleWindow)
         self.resizable(False, False)
         self.geometry('400x350')
-
-        self.grab_set()
+        
+        # Melhor compatibilidade com Linux/macOS
+        self.lift()
+        self.attributes('-topmost', True)
+        
+        try:
+            # Tenta usar grab_set com fallback para plataformas problemáticas
+            self.grab_set()
+        except Exception as e:
+            print(f"Warning: grab_set failed: {e}")
+            # Fallback: apenas lift a janela
+            self.lift()
         
         # Inicializar variáveis
         self.address = None
@@ -93,7 +104,11 @@ class TypeWindow(ctk.CTkToplevel):
         if hasattr(self, 'charactersEntry'):
             self.characters = self.charactersEntry.get()
         
-        self.grab_release()
+        try:
+            self.grab_release()
+        except Exception:
+            pass
+        
         self.destroy()
 
     def display_generated_section(self, password: str):
