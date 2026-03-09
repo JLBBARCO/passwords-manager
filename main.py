@@ -95,7 +95,7 @@ class App(ctk.CTk):
         self.table_canvas.configure(scrollregion=self.table_canvas.bbox("all"))
 
     def _copy_table_value(self, value):
-        from src.lib.Copy import Copy
+        from src.lib.copy import Copy
         text = str(value)
         if Copy.copy_to_clipboard(text):
             self.status_var.set(f"Copied: {text}")
@@ -204,7 +204,7 @@ class App(ctk.CTk):
             .grid(row=1, column=1, padx=5, pady=5)
 
     def copy_password(self, password):
-        from src.lib.Copy import Copy
+        from src.lib.copy import Copy
         if Copy.copy_to_clipboard(password):
             print("Copy password successfully!")
         else:

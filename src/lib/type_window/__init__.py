@@ -114,7 +114,7 @@ class TypeWindow(ctk.CTkToplevel):
     def display_generated_section(self, password: str):
         """Mostra a seção com senha gerada, botão de copiar e botão de salvar.
 
-        Usa `src.lib.Copy.Copy` para copiar e abre outro `TypeWindow` para salvar (Address/User).
+        Usa `src.lib.copy.Copy` para copiar e abre outro `TypeWindow` para salvar (Address/User).
         """
         # Remove área anterior se existir
         if getattr(self, 'generated_area', None) and self.generated_area.winfo_exists():
@@ -135,7 +135,7 @@ class TypeWindow(ctk.CTkToplevel):
 
         def _copy():
             try:
-                from src.lib.Copy import Copy
+                from src.lib.copy import Copy
                 ok = Copy.copy_to_clipboard(password)
                 self._show_message('Copied' if ok else 'Copy failed')
             except Exception as e:
