@@ -1,4 +1,4 @@
-from src.lib.external_libs import ctk
+import customtkinter as ctk
 from src.lib.system import select_installation_directory
 from src.lib.uninstall import detect_installation_path, run_uninstall
 import threading

@@ -1,10 +1,9 @@
 import os
+import platform
 import shutil
 import sys
 from pathlib import Path
 from tkinter import filedialog
-
-from src.lib.external_libs import platform
 
 APP_FOLDER_NAME = "Passwords Manager"
 

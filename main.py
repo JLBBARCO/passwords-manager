@@ -1,4 +1,5 @@
-﻿from src.lib.external_libs import ctk, tk
+﻿import customtkinter as ctk
+import tkinter as tk
 from src.lib.read_passwords import PasswordLoader
 from src.lib.type_window import TypeWindow
 import json

@@ -1,4 +1,4 @@
-from src.lib.external_libs import ctk
+import customtkinter as ctk
 from src.lib.system import path as system_path, select_installation_directory
 from pathlib import Path
 import hashlib
@@ -337,6 +337,9 @@ class Install(ctk.CTk):
         app_name = 'Passwords Manager'
         publisher = 'JLBBARCO'
         install_date = datetime.now().strftime('%Y%m%d')
+        install_location_ps = str(destination_path).replace("'", "''")
+        display_icon_ps = str(display_icon).replace("'", "''")
+        uninstall_string_ps = uninstall_string.replace("'", "''")
 
         reg_path = r'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PasswordsManager'
 
@@ -345,10 +348,10 @@ class Install(ctk.CTk):
             "if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null };"
             f"Set-ItemProperty -Path $path -Name 'DisplayName' -Value '{app_name}';"
             f"Set-ItemProperty -Path $path -Name 'Publisher' -Value '{publisher}';"
-            f"Set-ItemProperty -Path $path -Name 'InstallLocation' -Value '{str(destination_path).replace("'", "''")}';"
-            f"Set-ItemProperty -Path $path -Name 'DisplayIcon' -Value '{str(display_icon).replace("'", "''")}';"
-            f"Set-ItemProperty -Path $path -Name 'UninstallString' -Value '{uninstall_string.replace("'", "''")}';"
-            f"Set-ItemProperty -Path $path -Name 'QuietUninstallString' -Value '{uninstall_string.replace("'", "''")}';"
+            f"Set-ItemProperty -Path $path -Name 'InstallLocation' -Value '{install_location_ps}';"
+            f"Set-ItemProperty -Path $path -Name 'DisplayIcon' -Value '{display_icon_ps}';"
+            f"Set-ItemProperty -Path $path -Name 'UninstallString' -Value '{uninstall_string_ps}';"
+            f"Set-ItemProperty -Path $path -Name 'QuietUninstallString' -Value '{uninstall_string_ps}';"
             "Set-ItemProperty -Path $path -Name 'NoModify' -Type DWord -Value 1;"
             "Set-ItemProperty -Path $path -Name 'NoRepair' -Type DWord -Value 1;"
             f"Set-ItemProperty -Path $path -Name 'InstallDate' -Value '{install_date}';"
