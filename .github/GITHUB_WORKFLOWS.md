@@ -38,8 +38,9 @@ This directory contains GitHub Actions workflows to automate builds and releases
 
 **Outputs**:
 
-- "latest" release (pre-release) for commits
-- Versioned release for tags
+- Push to `main`: creates next patch tag automatically and triggers versioned release flow
+- Tag events (`v*`): versioned release for builds and distribution
+- Package publication: Winget + Homebrew for versioned tags
 - Artifacts available for 90 days
 
 ## 🚀 How to Use
@@ -54,7 +55,7 @@ git commit -m "Your message"
 git push origin main
 ```
 
-The workflow will create/update the "latest" release automatically.
+The workflow will create the next patch tag automatically (for example `v1.0.3`), then publish release + Winget + Homebrew from the tag run.
 
 ### Create Versioned Release
 
@@ -112,5 +113,4 @@ For more details about the build and release process, see:
 
 - Failed builds do not create/update releases
 - Artifacts are kept for 90 days
-- Pre-releases (latest) are marked as development builds
 - Tags should follow semantic versioning (ex: v1.0.0)

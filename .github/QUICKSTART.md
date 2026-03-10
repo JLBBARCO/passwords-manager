@@ -13,26 +13,25 @@ git commit -m "feat: new feature"
 git push origin main
 
 # 3. Wait ~5-10 minutes
-# The build will be done automatically!
+# A new version tag will be created automatically,
+# then release + Winget + Homebrew will be published!
 
 # 4. Access the release
 # https://github.com/JLBBARCO/passwords-manager/releases/latest
 ```
 
-### Create Official Version
+### Create Official Version Manually (Optional)
 
 ```bash
 # 1. Make sure you're on main
 git checkout main
 git pull
 
-# 2. Create the tag with version
+# 2. Create and push the tag
 git tag v1.0.0
-
-# 3. Push the tag
 git push origin v1.0.0
 
-# 4. Wait for build
+# 3. Wait for build
 # The release v1.0.0 will be created automatically!
 ```
 
@@ -65,13 +64,12 @@ build.bat
 
 ## Release Checklist
 
-Before creating an official release:
+Before pushing to `main` for automatic release:
 
 - [ ] Code is working locally
 - [ ] Tests have been performed
 - [ ] README.md is updated
 - [ ] ENCRYPTION.md is updated
-- [ ] Version was incremented correctly
 - [ ] CHANGELOG was updated (if exists)
 
 ## Build Status

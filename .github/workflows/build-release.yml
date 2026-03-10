@@ -8,9 +8,105 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      publish_packages:
+        description: "Run Winget and Homebrew publish jobs"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      publish_tag:
+        description: "Tag to publish packages from (example: v1.2.3)"
+        required: false
+        default: ""
+        type: string
 
 jobs:
+  prepare-release-context:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    outputs:
+      release_tag: ${{ steps.release_context.outputs.release_tag }}
+      build_version: ${{ steps.release_context.outputs.build_version }}
+      publish_packages: ${{ steps.release_context.outputs.publish_packages }}
+      run_builds: ${{ steps.release_context.outputs.run_builds }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release context and create tag on main
+        id: release_context
+        shell: bash
+        run: |
+          RELEASE_TAG=""
+          PUBLISH_PACKAGES="false"
+          RUN_BUILDS="true"
+
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+            PUBLISH_PACKAGES="true"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.publish_tag }}" ]]; then
+            RELEASE_TAG="${{ inputs.publish_tag }}"
+            if [[ "${RELEASE_TAG}" != v* ]]; then
+              RELEASE_TAG="v${RELEASE_TAG}"
+            fi
+            if [[ "${{ inputs.publish_packages }}" == "true" ]]; then
+              PUBLISH_PACKAGES="true"
+            fi
+          elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            EXISTING_TAG=$(git tag --points-at "${GITHUB_SHA}" "v*" | head -n 1)
+
+            if [[ -n "${EXISTING_TAG}" ]]; then
+              RELEASE_TAG="${EXISTING_TAG}"
+            else
+              LATEST_TAG=$(git tag -l 'v*' --sort=-version:refname | head -n 1)
+
+              if [[ -z "${LATEST_TAG}" ]]; then
+                NEXT_TAG="v0.0.1"
+              else
+                VERSION_PART="${LATEST_TAG#v}"
+                IFS='.' read -r MAJOR MINOR PATCH <<< "${VERSION_PART}"
+                MAJOR=${MAJOR:-0}
+                MINOR=${MINOR:-0}
+                PATCH=${PATCH:-0}
+                NEXT_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+              fi
+
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git tag "${NEXT_TAG}" "${GITHUB_SHA}"
+              git push origin "${NEXT_TAG}"
+              RELEASE_TAG="${NEXT_TAG}"
+            fi
+
+            PUBLISH_PACKAGES="true"
+            RUN_BUILDS="false"
+          else
+            RELEASE_TAG="latest"
+          fi
+
+          if [[ "${RELEASE_TAG}" == v* ]]; then
+            BUILD_VERSION="${RELEASE_TAG#v}"
+          else
+            BUILD_VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+
+          echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "build_version=${BUILD_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "publish_packages=${PUBLISH_PACKAGES}" >> "${GITHUB_OUTPUT}"
+          echo "run_builds=${RUN_BUILDS}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved release tag: ${RELEASE_TAG}"
+
   build-windows:
+    needs: [prepare-release-context]
+    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: windows-latest
     permissions:
       contents: read
@@ -19,19 +115,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Resolve build version
-        id: build_version
-        shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}"
-          if ("${{ github.ref_type }}" -ne "tag") {
-            $version = "0.0.0-dev.${{ github.run_number }}"
-          } else {
-            $version = $version -replace '^v', ''
-          }
-          "build_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Host "Build version: $version"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,7 +129,7 @@ jobs:
 
       - name: Build executables
         env:
-          PASSWORDS_MANAGER_VERSION: ${{ steps.build_version.outputs.build_version }}
+          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.build_version }}
         run: |
           python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=passwords-manager main.py
           python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=uninstall uninstall.py
@@ -59,7 +142,7 @@ jobs:
           mkdir installer-package
           copy dist\passwords-manager.exe release\
           copy dist\uninstall.exe release\uninstall\uninstall.exe
-          echo ${{ steps.build_version.outputs.build_version }} > release\VERSION
+          echo ${{ needs.prepare-release-context.outputs.build_version }} > release\VERSION
           copy README.md release\
           copy LICENSE release\
           copy ENCRYPTION.md release\ 2>nul || copy CRIPTOGRAFIA.md release\ENCRYPTION.md
@@ -79,6 +162,8 @@ jobs:
             installer-package/install-passwords-manager.exe
 
   build-linux:
+    needs: [prepare-release-context]
+    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -87,18 +172,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Resolve build version
-        id: build_version
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
-          fi
-          echo "build_version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Build version: ${VERSION}"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -116,7 +189,7 @@ jobs:
 
       - name: Build executable
         env:
-          PASSWORDS_MANAGER_VERSION: ${{ steps.build_version.outputs.build_version }}
+          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.build_version }}
         run: |
           python -m PyInstaller --onefile --noconsole --name=passwords-manager main.py
 
@@ -124,7 +197,7 @@ jobs:
         run: |
           mkdir release
           cp dist/passwords-manager release/
-          echo "${{ steps.build_version.outputs.build_version }}" > release/VERSION
+          echo "${{ needs.prepare-release-context.outputs.build_version }}" > release/VERSION
           cp README.md release/
           cp LICENSE release/
           cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/ 2>/dev/null || true
@@ -180,6 +253,8 @@ jobs:
             passwords-manager-x86_64.AppImage
 
   build-macos:
+    needs: [prepare-release-context]
+    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -188,18 +263,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Resolve build version
-        id: build_version
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
-          fi
-          echo "build_version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Build version: ${VERSION}"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -214,7 +277,7 @@ jobs:
 
       - name: Build executable
         env:
-          PASSWORDS_MANAGER_VERSION: ${{ steps.build_version.outputs.build_version }}
+          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.build_version }}
         run: |
           python -m PyInstaller --onefile --noconsole --name=passwords-manager main.py
 
@@ -222,7 +285,7 @@ jobs:
         run: |
           mkdir release
           cp dist/passwords-manager release/
-          echo "${{ steps.build_version.outputs.build_version }}" > release/VERSION
+          echo "${{ needs.prepare-release-context.outputs.build_version }}" > release/VERSION
           cp README.md release/
           cp LICENSE release/
           cp ENCRYPTION.md release/ 2>/dev/null || cp CRIPTOGRAFIA.md release/ 2>/dev/null || true
@@ -241,7 +304,8 @@ jobs:
           path: passwords-manager-macos.tar.gz
 
   create-release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: [prepare-release-context, build-windows, build-linux, build-macos]
+    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -260,11 +324,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION="latest"
-          fi
+          VERSION="${{ needs.prepare-release-context.outputs.release_tag }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
@@ -319,9 +379,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-winget:
-    needs: [create-release]
+    needs: [prepare-release-context, create-release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.prepare-release-context.outputs.run_builds == 'true' && needs.prepare-release-context.outputs.publish_packages == 'true'
     permissions:
       contents: read
 
@@ -334,9 +394,9 @@ jobs:
           installers-regex: 'install-passwords-manager\.exe$'
 
   publish-homebrew:
-    needs: [create-release]
+    needs: [prepare-release-context, create-release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.prepare-release-context.outputs.run_builds == 'true' && needs.prepare-release-context.outputs.publish_packages == 'true'
     permissions:
       contents: read
 
@@ -344,8 +404,10 @@ jobs:
       - name: Resolve version and URLs
         id: vars
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          RELEASE_TAG="${{ needs.prepare-release-context.outputs.release_tag }}"
+
+          VERSION="${RELEASE_TAG#v}"
+          BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
           LINUX_URL="${BASE_URL}/passwords-manager-linux.tar.gz"
           MAC_URL="${BASE_URL}/passwords-manager-macos.tar.gz"
 
