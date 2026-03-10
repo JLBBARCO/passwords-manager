@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - develop
       - criptograph
     tags:
       - "v*"
+      - "beta*"
   workflow_dispatch:
     inputs:
       publish_packages:
@@ -18,7 +20,7 @@ on:
           - "false"
           - "true"
       publish_tag:
-        description: "Tag to publish packages from (example: v1.2.3)"
+        description: "Tag to publish packages from (example: v1.2.3 or beta20260310120000-abc1234)"
         required: false
         default: ""
         type: string
@@ -33,6 +35,9 @@ jobs:
       release_tag: ${{ steps.release_context.outputs.release_tag }}
       build_version: ${{ steps.release_context.outputs.build_version }}
       publish_packages: ${{ steps.release_context.outputs.publish_packages }}
+      winget_identifier: ${{ steps.release_context.outputs.winget_identifier }}
+      homebrew_formula_file: ${{ steps.release_context.outputs.homebrew_formula_file }}
+      homebrew_formula_class: ${{ steps.release_context.outputs.homebrew_formula_class }}
 
     steps:
       - name: Checkout code
@@ -40,20 +45,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve release context and create tag on main
+      - name: Resolve release context and create tag on main/develop
         id: release_context
         shell: bash
         run: |
           RELEASE_TAG=""
           PUBLISH_PACKAGES="false"
+          WINGET_IDENTIFIER="JLBBARCO.PasswordsManager"
+          HOMEBREW_FORMULA_FILE="passwords-manager.rb"
+          HOMEBREW_FORMULA_CLASS="PasswordsManager"
 
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             RELEASE_TAG="${GITHUB_REF_NAME}"
             PUBLISH_PACKAGES="true"
+          elif [[ "${GITHUB_REF}" == refs/tags/beta* ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+            PUBLISH_PACKAGES="true"
+            WINGET_IDENTIFIER="JLBBARCO.PasswordsManager.Beta"
+            HOMEBREW_FORMULA_FILE="passwords-manager-beta.rb"
+            HOMEBREW_FORMULA_CLASS="PasswordsManagerBeta"
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.publish_tag }}" ]]; then
             RELEASE_TAG="${{ inputs.publish_tag }}"
-            if [[ "${RELEASE_TAG}" != v* ]]; then
+            if [[ "${RELEASE_TAG}" != v* && "${RELEASE_TAG}" != beta* ]]; then
               RELEASE_TAG="v${RELEASE_TAG}"
+            fi
+            if [[ "${RELEASE_TAG}" == beta* ]]; then
+              WINGET_IDENTIFIER="JLBBARCO.PasswordsManager.Beta"
+              HOMEBREW_FORMULA_FILE="passwords-manager-beta.rb"
+              HOMEBREW_FORMULA_CLASS="PasswordsManagerBeta"
             fi
             if [[ "${{ inputs.publish_packages }}" == "true" ]]; then
               PUBLISH_PACKAGES="true"
@@ -85,12 +104,35 @@ jobs:
             fi
 
             PUBLISH_PACKAGES="true"
+          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            EXISTING_BETA_TAG=$(git tag --points-at "${GITHUB_SHA}" "beta*" | head -n 1)
+
+            if [[ -n "${EXISTING_BETA_TAG}" ]]; then
+              RELEASE_TAG="${EXISTING_BETA_TAG}"
+            else
+              UTC_TS=$(date -u +%Y%m%d%H%M%S)
+              SHORT_SHA=$(git rev-parse --short "${GITHUB_SHA}")
+              NEXT_TAG="beta${UTC_TS}-${SHORT_SHA}"
+
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git tag "${NEXT_TAG}" "${GITHUB_SHA}"
+              git push origin "${NEXT_TAG}"
+              RELEASE_TAG="${NEXT_TAG}"
+            fi
+
+            PUBLISH_PACKAGES="true"
+            WINGET_IDENTIFIER="JLBBARCO.PasswordsManager.Beta"
+            HOMEBREW_FORMULA_FILE="passwords-manager-beta.rb"
+            HOMEBREW_FORMULA_CLASS="PasswordsManagerBeta"
           else
             RELEASE_TAG="latest"
           fi
 
           if [[ "${RELEASE_TAG}" == v* ]]; then
             BUILD_VERSION="${RELEASE_TAG#v}"
+          elif [[ "${RELEASE_TAG}" == beta* ]]; then
+            BUILD_VERSION="${RELEASE_TAG}"
           else
             BUILD_VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
           fi
@@ -98,6 +140,9 @@ jobs:
           echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "build_version=${BUILD_VERSION}" >> "${GITHUB_OUTPUT}"
           echo "publish_packages=${PUBLISH_PACKAGES}" >> "${GITHUB_OUTPUT}"
+          echo "winget_identifier=${WINGET_IDENTIFIER}" >> "${GITHUB_OUTPUT}"
+          echo "homebrew_formula_file=${HOMEBREW_FORMULA_FILE}" >> "${GITHUB_OUTPUT}"
+          echo "homebrew_formula_class=${HOMEBREW_FORMULA_CLASS}" >> "${GITHUB_OUTPUT}"
           echo "Resolved release tag: ${RELEASE_TAG}"
 
   build-windows:
@@ -366,7 +411,7 @@ jobs:
             scripts/uninstall-unix.sh
             packaging/homebrew/passwords-manager.rb
           draft: false
-          prerelease: false
+          prerelease: ${{ startsWith(steps.version.outputs.version, 'beta') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -378,12 +423,53 @@ jobs:
       contents: read
 
     steps:
+      - name: Check if package exists in winget-pkgs
+        id: winget_check
+        shell: bash
+        run: |
+          IDENTIFIER="${{ needs.prepare-release-context.outputs.winget_identifier }}"
+          IFS='.' read -r -a PARTS <<< "${IDENTIFIER}"
+
+          if [[ ${#PARTS[@]} -lt 2 ]]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Invalid Winget identifier: ${IDENTIFIER}"
+            exit 0
+          fi
+
+          FIRST_CHAR=$(echo "${IDENTIFIER}" | tr '[:upper:]' '[:lower:]' | cut -c1)
+          MANIFEST_PATH="manifests/${FIRST_CHAR}/${PARTS[0]}/${PARTS[1]}"
+          if [[ ${#PARTS[@]} -gt 2 ]]; then
+            for ((i=2; i<${#PARTS[@]}; i++)); do
+              MANIFEST_PATH+="/${PARTS[i]}"
+            done
+          fi
+
+          CHECK_URL="https://api.github.com/repos/microsoft/winget-pkgs/contents/${MANIFEST_PATH}"
+          HTTP_CODE=$(curl -s -o /tmp/winget-check.json -w "%{http_code}" "${CHECK_URL}")
+
+          if [[ "${HTTP_CODE}" == "200" ]]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Winget package exists for ${IDENTIFIER}."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Winget package does not exist for ${IDENTIFIER}. Skipping automatic publish."
+          fi
+
       - name: Publish to winget
+        if: steps.winget_check.outputs.exists == 'true'
         uses: vedantmgoyal2009/winget-releaser@v2
         with:
           token: ${{ github.token }}
-          identifier: JLBBARCO.PasswordsManager
+          identifier: ${{ needs.prepare-release-context.outputs.winget_identifier }}
           installers-regex: 'install-passwords-manager\.exe$'
+          release-tag: ${{ needs.prepare-release-context.outputs.release_tag }}
+
+      - name: Inform Winget bootstrap requirement
+        if: steps.winget_check.outputs.exists != 'true'
+        shell: bash
+        run: |
+          echo "Winget publish skipped: package identifier not found in microsoft/winget-pkgs." >> "$GITHUB_STEP_SUMMARY"
+          echo "Create the first package version manually, then this workflow will publish updates automatically." >> "$GITHUB_STEP_SUMMARY"
 
   publish-homebrew:
     needs: [prepare-release-context, create-release]
@@ -424,9 +510,12 @@ jobs:
 
       - name: Update formula
         run: |
+          FORMULA_FILE="${{ needs.prepare-release-context.outputs.homebrew_formula_file }}"
+          FORMULA_CLASS="${{ needs.prepare-release-context.outputs.homebrew_formula_class }}"
+
           mkdir -p homebrew-tap/Formula
-          cat > homebrew-tap/Formula/passwords-manager.rb << EOF
-          class PasswordsManager < Formula
+          cat > "homebrew-tap/Formula/${FORMULA_FILE}" << EOF
+          class ${FORMULA_CLASS} < Formula
             desc "Password manager with encrypted local storage"
             homepage "https://github.com/JLBBARCO/passwords-manager"
             version "${{ steps.vars.outputs.version }}"
@@ -456,8 +545,10 @@ jobs:
       - name: Commit and push formula update
         run: |
           cd homebrew-tap
+          FORMULA_FILE="${{ needs.prepare-release-context.outputs.homebrew_formula_file }}"
+          FORMULA_NAME="${FORMULA_FILE%.rb}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/passwords-manager.rb
-          git commit -m "chore: update passwords-manager to ${{ steps.vars.outputs.version }}" || exit 0
+          git add "Formula/${FORMULA_FILE}"
+          git commit -m "chore: update ${FORMULA_NAME} to ${{ steps.vars.outputs.version }}" || exit 0
           git push
