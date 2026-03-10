@@ -326,23 +326,10 @@ jobs:
       contents: read
 
     steps:
-      - name: Resolve winget token
-        id: winget_token
-        shell: bash
-        env:
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-          GITHUB_TOKEN_FALLBACK: ${{ github.token }}
-        run: |
-          if [[ -n "${WINGET_TOKEN}" ]]; then
-            echo "token=${WINGET_TOKEN}" >> "$GITHUB_OUTPUT"
-          else
-            echo "token=${GITHUB_TOKEN_FALLBACK}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Publish to winget
         uses: vedantmgoyal2009/winget-releaser@v2
         with:
-          token: ${{ steps.winget_token.outputs.token }}
+          token: ${{ github.token }}
           identifier: JLBBARCO.PasswordsManager
           installers-regex: 'install-passwords-manager\.exe$'
 
@@ -354,19 +341,6 @@ jobs:
       contents: read
 
     steps:
-      - name: Resolve homebrew tap token
-        id: tap_token
-        shell: bash
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          GITHUB_TOKEN_FALLBACK: ${{ github.token }}
-        run: |
-          if [[ -n "${HOMEBREW_TAP_TOKEN}" ]]; then
-            echo "token=${HOMEBREW_TAP_TOKEN}" >> "$GITHUB_OUTPUT"
-          else
-            echo "token=${GITHUB_TOKEN_FALLBACK}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Resolve version and URLs
         id: vars
         run: |
@@ -391,7 +365,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: JLBBARCO/homebrew-tap
-          token: ${{ steps.tap_token.outputs.token }}
+          token: ${{ github.token }}
           path: homebrew-tap
 
       - name: Update formula
