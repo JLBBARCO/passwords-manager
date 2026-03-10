@@ -8,9 +8,9 @@ This repository has an automated GitHub Actions workflow that compiles Password 
 
 The workflow is triggered in the following situations:
 
-1. **Push to `main` branch**: Automatic build and update of "latest" release
+1. **Push to `main` branch**: Automatic version tag creation (`vX.Y.Z`) and package publication flow
 2. **Push to `criptograph` branch**: Development build
-3. **Tag creation**: To create versioned releases (ex: `v1.0.0`, `v2.1.3`)
+3. **Tag creation**: Versioned releases (example: `v1.0.0`, `v2.1.3`)
 4. **Manual execution**: Via GitHub Actions interface
 
 ## 🏗️ Build Process
@@ -85,33 +85,30 @@ The workflow is triggered in the following situations:
 
 ## 🏷️ Release System
 
-### "Latest" Release
-
-- **When**: Created/updated with each push to `main` or `criptograph` branch
-- **Type**: Pre-release (development)
-- **Tag**: `latest`
-- **Description**: Contains the latest build of the code
-
 ### Versioned Releases
 
-To create a versioned release:
+When a commit reaches `main`, the workflow now:
+
+1. Finds the latest `v*` tag
+2. Creates the next patch tag automatically (example: `v1.4.7` -> `v1.4.8`)
+3. Pushes the new tag
+4. Runs build + release from the tag event
+5. Publishes to Winget and updates the Homebrew tap
+
+You can still create and push a tag manually:
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Or via GitHub:
-
-1. Go to "Releases" → "Create a new release"
-2. Create a new tag (ex: `v1.0.0`)
-3. Publish the release
-
-The workflow will detect the tag and automatically create:
+In both automatic and manual tag flows, the workflow creates:
 
 - Release with version name
 - Build for Windows, Linux and macOS
 - Compressed files attached
+- Winget publication
+- Homebrew formula update
 
 ## 📝 Release Information
 
@@ -252,6 +249,6 @@ To track builds:
 When contributing:
 
 1. Push to your branch
-2. Workflow will create a test build
-3. After merge to `main`, "latest" release will be updated
-4. For official releases, create a tag with version
+2. Workflow creates development build for non-main branches
+3. After merge/push to `main`, a new version tag is created automatically
+4. The tag run publishes GitHub Release, Winget, and Homebrew
