@@ -103,6 +103,12 @@ After the package is published in winget, install with:
 winget install JLBBARCO.PasswordsManager
 ```
 
+Beta channel (published from `develop`):
+
+```powershell
+winget install JLBBARCO.PasswordsManager.Beta
+```
+
 ### Linux and macOS (script installer)
 
 Install directly from latest GitHub Release:
@@ -126,6 +132,13 @@ You can host it in your own tap and install with:
 ```bash
 brew tap <your-org>/passwords-manager
 brew install passwords-manager
+```
+
+Beta channel formula (published from `develop`):
+
+```bash
+brew tap JLBBARCO/homebrew-tap
+brew install passwords-manager-beta
 ```
 
 ### � Pre-Compiled Executables

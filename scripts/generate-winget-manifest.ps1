@@ -3,18 +3,85 @@ param(
     [string]$Version,
     [string]$Publisher = "JLBBARCO",
     [string]$PackageIdentifier = "JLBBARCO.PasswordsManager",
-    [string]$InstallerUrl = ""
+  [string]$InstallerUrl = "",
+  [string]$ReleaseTag = ""
 )
 
 $ErrorActionPreference = "Stop"
 
+function Get-DefaultReleaseTag {
+  param(
+    [string]$InputVersion,
+    [string]$InputTag
+  )
+
+  if ($InputTag) {
+    return $InputTag
+  }
+
+  if ($InputVersion -match '^beta') {
+    return $InputVersion
+  }
+
+  return "v$InputVersion"
+}
+
+function Download-InstallerWithRetry {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Url,
+    [Parameter(Mandatory = $true)]
+    [string]$OutputFile,
+    [int]$MaxAttempts = 4
+  )
+
+  $headers = @{
+    'User-Agent' = 'passwords-manager-winget-bootstrap'
+    'Accept' = 'application/octet-stream'
+  }
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    try {
+      Write-Host "Download attempt $attempt/$MaxAttempts" -ForegroundColor DarkCyan
+      Invoke-WebRequest -Uri $Url -OutFile $OutputFile -Headers $headers -UseBasicParsing -TimeoutSec 120
+      if ((Test-Path $OutputFile) -and ((Get-Item $OutputFile).Length -gt 0)) {
+        return
+      }
+      throw "Downloaded file is empty"
+    }
+    catch {
+      if ($attempt -eq $MaxAttempts) {
+        throw
+      }
+      Start-Sleep -Seconds (2 * $attempt)
+    }
+  }
+}
+
+# Improve compatibility with older PowerShell defaults on Windows.
+try {
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls11
+}
+catch {
+  # Ignore when the host does not expose these values.
+}
+
+$resolvedReleaseTag = Get-DefaultReleaseTag -InputVersion $Version -InputTag $ReleaseTag
+
 if (-not $InstallerUrl) {
-    $InstallerUrl = "https://github.com/JLBBARCO/passwords-manager/releases/download/v$Version/install-passwords-manager.exe"
+  $InstallerUrl = "https://github.com/JLBBARCO/passwords-manager/releases/download/$resolvedReleaseTag/install-passwords-manager.exe"
 }
 
 Write-Host "Downloading installer to calculate SHA256..." -ForegroundColor Yellow
 $tempFile = Join-Path $env:TEMP ("passwords-manager-installer-" + $Version + ".exe")
-Invoke-WebRequest -Uri $InstallerUrl -OutFile $tempFile
+try {
+  Download-InstallerWithRetry -Url $InstallerUrl -OutputFile $tempFile
+}
+catch {
+  Write-Error "Failed to download installer from '$InstallerUrl'. Verify that release/tag '$resolvedReleaseTag' exists and includes install-passwords-manager.exe."
+  throw
+}
+
 $sha256 = (Get-FileHash -Path $tempFile -Algorithm SHA256).Hash
 Remove-Item -Force $tempFile
 
@@ -61,7 +128,7 @@ LicenseUrl: https://github.com/JLBBARCO/passwords-manager/blob/main/LICENSE
 ShortDescription: Password manager with encrypted local storage.
 Description: Manage and generate passwords with encrypted local storage under LocalAppData.
 Moniker: passwords-manager
-ReleaseNotesUrl: https://github.com/JLBBARCO/passwords-manager/releases/tag/v$Version
+ReleaseNotesUrl: https://github.com/JLBBARCO/passwords-manager/releases/tag/$resolvedReleaseTag
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0
 "@
