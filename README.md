@@ -139,6 +139,7 @@ Available for:
 - **Windows**: `passwords-manager-windows.zip`
 - **Windows Installer**: `install-passwords-manager.exe`
 - **Linux**: `passwords-manager-linux.tar.gz`
+- **Linux AppImage**: `passwords-manager-x86_64.AppImage`
 - **macOS**: `passwords-manager-macos.tar.gz`
 
 Executables are automatically compiled via GitHub Actions with each update.

@@ -40,6 +40,17 @@ pip install -r requirements.txt --quiet
 pip install pyinstaller --quiet
 Write-Host "✓ Dependências instaladas" -ForegroundColor Green
 
+$buildVersion = "0.0.0-local"
+try {
+    $gitTag = git describe --tags --abbrev=0 2>$null
+    if ($LASTEXITCODE -eq 0 -and $gitTag) {
+        $buildVersion = ($gitTag.Trim() -replace '^v', '')
+    }
+} catch {
+}
+$env:PASSWORDS_MANAGER_VERSION = $buildVersion
+Write-Host "Versão de build detectada: $buildVersion" -ForegroundColor Cyan
+
 # Limpa builds anteriores
 Write-Host ""
 Write-Host "Limpando builds anteriores..." -ForegroundColor Yellow
@@ -81,6 +92,7 @@ New-Item -ItemType Directory -Force -Path "release\uninstall" | Out-Null
 New-Item -ItemType Directory -Force -Path "installer-package" | Out-Null
 Copy-Item "dist\passwords-manager.exe" "release\"
 Copy-Item "dist\uninstall.exe" "release\uninstall\uninstall.exe"
+Set-Content -Path "release\VERSION" -Value $buildVersion -Encoding UTF8
 Copy-Item "README.md" "release\"
 Copy-Item "LICENSE" "release\"
 if (Test-Path "ENCRYPTION.md") {

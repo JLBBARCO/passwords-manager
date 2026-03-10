@@ -1,8 +1,66 @@
 ﻿from src.lib.external_libs import ctk, tk
 from src.lib.read_passwords import PasswordLoader
 from src.lib.type_window import TypeWindow
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 
 padMain = 10
+REPO_SLUG = 'JLBBARCO/passwords-manager'
+
+
+def _sanitize_version(version_text):
+    return str(version_text or '').strip().lstrip('v')
+
+
+def _read_version_file(base_path):
+    for filename in ('VERSION', 'version.txt'):
+        candidate = Path(base_path) / filename
+        if candidate.exists():
+            return _sanitize_version(candidate.read_text(encoding='utf-8').strip())
+    return ''
+
+
+def _get_app_version():
+    for env_name in ('PASSWORDS_MANAGER_VERSION', 'APP_VERSION'):
+        env_value = _sanitize_version(os.environ.get(env_name, ''))
+        if env_value:
+            return env_value
+
+    if getattr(sys, 'frozen', False):
+        runtime_dir = Path(sys.executable).resolve().parent
+        runtime_version = _read_version_file(runtime_dir)
+        if runtime_version:
+            return runtime_version
+
+    source_version = _read_version_file(Path(__file__).resolve().parent)
+    if source_version:
+        return source_version
+
+    try:
+        repo_root = Path(__file__).resolve().parent
+        result = subprocess.run(
+            ['git', 'describe', '--tags', '--abbrev=0'],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return _sanitize_version(result.stdout)
+    except Exception:
+        pass
+
+    return '0.0.0'
+
+
+APP_VERSION = _get_app_version()
 
 class App(ctk.CTk):
     def __init__(self):
@@ -84,11 +142,86 @@ class App(ctk.CTk):
             self.areaGenerate, text='Generate a Complex Password', command=self.complexPassword)
         self.buttonGenerateComplexPassword.grid(row=1, column=0, padx=padMain, pady=padMain)
 
+        self.buttonCheckUpdate = ctk.CTkButton(
+            self.areaGenerate, text='Check Updates', command=self.check_updates_and_prompt)
+        self.buttonCheckUpdate.grid(row=2, column=0, padx=padMain, pady=padMain)
+
         # Non-GUI generation controls removed to avoid overlapping widgets
 
         self.areaPrintPassword = None
 
         self.check_loading_status()
+
+    def _parse_version(self, version_text):
+        cleaned = (version_text or '').strip().lower().replace('v', '')
+        parts = []
+        for token in cleaned.split('.'):
+            digits = ''.join(character for character in token if character.isdigit())
+            parts.append(int(digits) if digits else 0)
+        while len(parts) < 3:
+            parts.append(0)
+        return tuple(parts[:3])
+
+    def _latest_release_version(self):
+        api_url = f'https://api.github.com/repos/{REPO_SLUG}/releases/latest'
+        request = Request(api_url, headers={'User-Agent': 'passwords-manager'})
+        with urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+        tag_name = str(payload.get('tag_name', '')).strip()
+        if not tag_name:
+            raise ValueError('Versão mais recente não encontrada no GitHub.')
+        return tag_name.replace('v', '')
+
+    def check_for_updates(self):
+        latest_version = self._latest_release_version()
+        has_update = self._parse_version(latest_version) > self._parse_version(APP_VERSION)
+        return has_update, latest_version
+
+    def run_update(self):
+        system_name = platform.system()
+
+        if system_name == 'Windows':
+            if not shutil.which('winget'):
+                raise RuntimeError('winget não encontrado neste sistema.')
+            subprocess.Popen(['winget', 'upgrade', 'JLBBARCO.PasswordsManager'])
+            return 'winget'
+
+        if system_name in ('Darwin', 'Linux'):
+            if not shutil.which('brew'):
+                raise RuntimeError('Homebrew não encontrado neste sistema.')
+            subprocess.Popen(['brew', 'upgrade', 'passwords-manager'])
+            return 'brew'
+
+        raise RuntimeError(f'Sistema não suportado para atualização automática: {system_name}')
+
+    def check_updates_and_prompt(self):
+        from tkinter import messagebox
+        try:
+            has_update, latest_version = self.check_for_updates()
+            if not has_update:
+                messagebox.showinfo('Passwords Manager', f'Você já está na versão mais recente ({APP_VERSION}).')
+                return
+
+            should_update = messagebox.askyesno(
+                'Passwords Manager',
+                (
+                    f'Nova versão encontrada: {latest_version}\n'
+                    f'Versão atual: {APP_VERSION}\n\n'
+                    'Deseja iniciar a atualização agora?'
+                ),
+            )
+            if not should_update:
+                return
+
+            updater = self.run_update()
+            messagebox.showinfo(
+                'Passwords Manager',
+                f'Comando de atualização disparado via {updater}.',
+            )
+        except (URLError, HTTPError, ValueError, RuntimeError) as exception:
+            messagebox.showerror('Passwords Manager', f'Não foi possível atualizar:\n{exception}')
+        except Exception as exception:
+            messagebox.showerror('Passwords Manager', f'Erro inesperado:\n{exception}')
 
     def _update_table_scrollregion(self, _event=None):
         self.table_canvas.configure(scrollregion=self.table_canvas.bbox("all"))

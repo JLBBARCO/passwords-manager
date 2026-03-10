@@ -96,7 +96,20 @@ class Uninstall(ctk.CTk):
             self.after(0, self.progress_bar.set, 1)
             self.after(0, lambda: self.progress_counter.configure(text='100%'))
             self.after(0, lambda: self.status.configure(text='Desinstalação concluída'))
-            self.after(0, messagebox.showinfo, program_title, f"Itens removidos: {result['removed']}")
+            self.after(
+                0,
+                messagebox.showinfo,
+                program_title,
+                (
+                    f"Itens removidos: {result['removed']}\n"
+                    f"Itens ignorados: {result.get('skipped', 0)}"
+                    + (
+                        '\nLimpeza final agendada em segundo plano.'
+                        if result.get('cleanup_scheduled')
+                        else ''
+                    )
+                ),
+            )
             self.after(0, self.destroy)
         except Exception as exception:
             self.after(0, lambda: self.status.configure(text='Falha na desinstalação'))
