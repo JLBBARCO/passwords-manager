@@ -93,7 +93,8 @@ When a commit reaches `main`, the workflow now:
 2. Creates the next patch tag automatically (example: `v1.4.7` -> `v1.4.8`)
 3. Pushes the new tag
 4. Runs build + release from the tag event
-5. Publishes to Winget and updates the Homebrew tap
+5. Publishes to Winget
+6. Updates Homebrew tap only when a tap repository is configured
 
 You can still create and push a tag manually:
 
@@ -108,7 +109,7 @@ In both automatic and manual tag flows, the workflow creates:
 - Build for Windows, Linux and macOS
 - Compressed files attached
 - Winget publication
-- Homebrew formula update
+- Homebrew formula update (optional, requires tap repository)
 
 ## 📝 Release Information
 
@@ -193,6 +194,16 @@ The workflow uses automatic `GITHUB_TOKEN` with permissions for:
 - Upload assets
 - Read repository code
 
+### Optional Homebrew Tap Configuration
+
+Homebrew publish is optional. If no tap repository is configured, the workflow skips Homebrew update and continues successfully.
+
+To enable Homebrew publishing:
+
+1. Create a tap repository (example: `JLBBARCO/homebrew-tap`)
+2. In `.github/workflows/build-release.yml`, set `HOMEBREW_TAP_REPOSITORY` to your tap repo name
+3. If your tap is private or in a different scope, use a PAT with `repo` permission instead of default `github.token`
+
 ### Modifying the Workflow
 
 To adjust the behavior:
@@ -215,6 +226,12 @@ To adjust the behavior:
 1. Check if commit was to correct branch
 2. Confirm workflow was executed ("Actions" tab)
 3. Check `GITHUB_TOKEN` permissions
+
+### Homebrew Publish Skipped
+
+1. Confirm `HOMEBREW_TAP_REPOSITORY` is configured in workflow
+2. Confirm the tap repository exists
+3. If needed, use PAT with access to tap repository
 
 ### Missing File
 

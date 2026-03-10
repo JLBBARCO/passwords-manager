@@ -477,6 +477,9 @@ jobs:
     if: needs.prepare-release-context.outputs.publish_packages == 'true'
     permissions:
       contents: read
+    env:
+      HOMEBREW_TAP_REPOSITORY: ""
+      HOMEBREW_TAP_TOKEN: ${{ github.token }}
 
     steps:
       - name: Resolve version and URLs
@@ -501,14 +504,41 @@ jobs:
           echo "linux_sha=${LINUX_SHA}" >> $GITHUB_OUTPUT
           echo "mac_sha=${MAC_SHA}" >> $GITHUB_OUTPUT
 
+      - name: Check access to Homebrew tap repository
+        id: tap_access
+        shell: bash
+        run: |
+          if [[ -z "${HOMEBREW_TAP_REPOSITORY}" ]]; then
+            echo "accessible=false" >> "$GITHUB_OUTPUT"
+            echo "Homebrew tap repository not configured."
+            exit 0
+          fi
+
+          REPO_API="https://api.github.com/repos/${HOMEBREW_TAP_REPOSITORY}"
+
+          HTTP_CODE=$(curl -s -o /tmp/homebrew-tap-check.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${HOMEBREW_TAP_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${REPO_API}")
+
+          if [[ "${HTTP_CODE}" == "200" ]]; then
+            echo "accessible=true" >> "$GITHUB_OUTPUT"
+            echo "Homebrew tap repository is accessible."
+          else
+            echo "accessible=false" >> "$GITHUB_OUTPUT"
+            echo "Homebrew tap repository is not accessible (HTTP ${HTTP_CODE})."
+          fi
+
       - name: Checkout homebrew tap repository
+        if: steps.tap_access.outputs.accessible == 'true'
         uses: actions/checkout@v4
         with:
-          repository: JLBBARCO/homebrew-tap
-          token: ${{ github.token }}
+          repository: ${{ env.HOMEBREW_TAP_REPOSITORY }}
+          token: ${{ env.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
       - name: Update formula
+        if: steps.tap_access.outputs.accessible == 'true'
         run: |
           FORMULA_FILE="${{ needs.prepare-release-context.outputs.homebrew_formula_file }}"
           FORMULA_CLASS="${{ needs.prepare-release-context.outputs.homebrew_formula_class }}"
@@ -543,6 +573,7 @@ jobs:
           EOF
 
       - name: Commit and push formula update
+        if: steps.tap_access.outputs.accessible == 'true'
         run: |
           cd homebrew-tap
           FORMULA_FILE="${{ needs.prepare-release-context.outputs.homebrew_formula_file }}"
@@ -552,3 +583,15 @@ jobs:
           git add "Formula/${FORMULA_FILE}"
           git commit -m "chore: update ${FORMULA_NAME} to ${{ steps.vars.outputs.version }}" || exit 0
           git push
+
+      - name: Inform Homebrew tap access requirement
+        if: steps.tap_access.outputs.accessible != 'true'
+        shell: bash
+        run: |
+          if [[ -z "${HOMEBREW_TAP_REPOSITORY}" ]]; then
+            echo "Homebrew publish skipped: set HOMEBREW_TAP_REPOSITORY in workflow env (example: JLBBARCO/homebrew-tap)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Create a tap repository first, then this workflow will publish formula updates automatically." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Homebrew publish skipped: repository ${HOMEBREW_TAP_REPOSITORY} is not accessible with current token." >> "$GITHUB_STEP_SUMMARY"
+            echo "The default github.token usually cannot write across repositories. Use a PAT with repo permissions if needed." >> "$GITHUB_STEP_SUMMARY"
+          fi
