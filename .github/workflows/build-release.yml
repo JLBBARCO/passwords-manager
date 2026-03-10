@@ -33,7 +33,6 @@ jobs:
       release_tag: ${{ steps.release_context.outputs.release_tag }}
       build_version: ${{ steps.release_context.outputs.build_version }}
       publish_packages: ${{ steps.release_context.outputs.publish_packages }}
-      run_builds: ${{ steps.release_context.outputs.run_builds }}
 
     steps:
       - name: Checkout code
@@ -47,7 +46,6 @@ jobs:
         run: |
           RELEASE_TAG=""
           PUBLISH_PACKAGES="false"
-          RUN_BUILDS="true"
 
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             RELEASE_TAG="${GITHUB_REF_NAME}"
@@ -87,7 +85,6 @@ jobs:
             fi
 
             PUBLISH_PACKAGES="true"
-            RUN_BUILDS="false"
           else
             RELEASE_TAG="latest"
           fi
@@ -101,12 +98,10 @@ jobs:
           echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "build_version=${BUILD_VERSION}" >> "${GITHUB_OUTPUT}"
           echo "publish_packages=${PUBLISH_PACKAGES}" >> "${GITHUB_OUTPUT}"
-          echo "run_builds=${RUN_BUILDS}" >> "${GITHUB_OUTPUT}"
           echo "Resolved release tag: ${RELEASE_TAG}"
 
   build-windows:
     needs: [prepare-release-context]
-    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: windows-latest
     permissions:
       contents: read
@@ -163,7 +158,6 @@ jobs:
 
   build-linux:
     needs: [prepare-release-context]
-    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -254,7 +248,6 @@ jobs:
 
   build-macos:
     needs: [prepare-release-context]
-    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -305,7 +298,6 @@ jobs:
 
   create-release:
     needs: [prepare-release-context, build-windows, build-linux, build-macos]
-    if: needs.prepare-release-context.outputs.run_builds == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -381,7 +373,7 @@ jobs:
   publish-winget:
     needs: [prepare-release-context, create-release]
     runs-on: ubuntu-latest
-    if: needs.prepare-release-context.outputs.run_builds == 'true' && needs.prepare-release-context.outputs.publish_packages == 'true'
+    if: needs.prepare-release-context.outputs.publish_packages == 'true'
     permissions:
       contents: read
 
@@ -396,7 +388,7 @@ jobs:
   publish-homebrew:
     needs: [prepare-release-context, create-release]
     runs-on: ubuntu-latest
-    if: needs.prepare-release-context.outputs.run_builds == 'true' && needs.prepare-release-context.outputs.publish_packages == 'true'
+    if: needs.prepare-release-context.outputs.publish_packages == 'true'
     permissions:
       contents: read
 
