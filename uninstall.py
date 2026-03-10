@@ -1,6 +1,6 @@
 from typing import Tuple
 
-import customtkinter as ctk
+from src.lib.external_libs import ctk
 
 program_title = 'Uninstall Passwords Manager'
 progress = 20
