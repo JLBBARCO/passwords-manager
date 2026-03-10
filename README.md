@@ -93,6 +93,41 @@ python main.py
 
 ## Downloads
 
+## Package Managers
+
+### Windows (winget)
+
+After the package is published in winget, install with:
+
+```powershell
+winget install JLBBARCO.PasswordsManager
+```
+
+### Linux and macOS (script installer)
+
+Install directly from latest GitHub Release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/install-unix.sh | bash
+```
+
+Uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/uninstall-unix.sh | bash
+```
+
+### macOS and Linux (Homebrew tap alternative)
+
+This repository now includes a Homebrew formula template at `packaging/homebrew/passwords-manager.rb`.
+
+You can host it in your own tap and install with:
+
+```bash
+brew tap <your-org>/passwords-manager
+brew install passwords-manager
+```
+
 ### � Pre-Compiled Executables
 
 Download the latest version compiled automatically:
@@ -102,6 +137,7 @@ Download the latest version compiled automatically:
 Available for:
 
 - **Windows**: `passwords-manager-windows.zip`
+- **Windows Installer**: `install-passwords-manager.exe`
 - **Linux**: `passwords-manager-linux.tar.gz`
 - **macOS**: `passwords-manager-macos.tar.gz`
 

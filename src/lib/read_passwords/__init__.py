@@ -3,6 +3,7 @@ import json
 import os
 from src.lib import converter
 from src.lib.crypto import get_crypto_manager
+from src.lib.system import find_data_file, prepare_local_data_file
 
 class PasswordLoader:
 
@@ -14,6 +15,8 @@ class PasswordLoader:
         self.ErrorFileNotFound = "File Not Found"
         self.loading_thread = None
         self.crypto = get_crypto_manager()
+        self.json_file = str(prepare_local_data_file('passwords.json'))
+        self.csv_file = str(find_data_file('passwords.csv'))
         self.start_loading()
 
     def load_data(self):
@@ -23,9 +26,9 @@ class PasswordLoader:
                 self.app.after(0, lambda: self.app.update_status(self.status_message))
             
             # Verifica se o arquivo existe
-            if not os.path.exists('passwords.json') and os.path.exists('passwords.csv'):
-                converter.convertToCSV()
-            elif not os.path.exists('passwords.json'):
+            if not os.path.exists(self.json_file) and os.path.exists(self.csv_file):
+                converter.convertToCSV(self.csv_file, self.json_file)
+            elif not os.path.exists(self.json_file):
                 self.status_message = self.ErrorFileNotFound
                 self.data_loaded = True  # Define como True mesmo sem dados
                 if hasattr(self.app, 'after'):
@@ -33,7 +36,7 @@ class PasswordLoader:
                 return
             
             # Lê o arquivo JSON
-            with open('passwords.json', 'r', encoding='utf-8') as f:
+            with open(self.json_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 
                 # Converte os dados para o formato esperado
@@ -56,7 +59,7 @@ class PasswordLoader:
                     self.app.after(0, lambda: self.app.update_status(self.status_message))
                 
                 # Cria backup antes de migrar
-                backup_file = 'passwords_backup_unencrypted.json'
+                backup_file = str(prepare_local_data_file('passwords_backup_unencrypted.json'))
                 with open(backup_file, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)
                 print(f"✓ Backup criado em: {backup_file}")
@@ -75,7 +78,7 @@ class PasswordLoader:
                     data['passwords'] = self.passwords_data
                     encrypted_data = data
                 
-                with open('passwords.json', 'w', encoding='utf-8') as f:
+                with open(self.json_file, 'w', encoding='utf-8') as f:
                     json.dump(encrypted_data, f, indent=2, ensure_ascii=False)
                 
                 print(f"✓ {len(self.passwords_data)} senha(s) migrada(s) para formato criptografado.")

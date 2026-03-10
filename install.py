@@ -104,13 +104,18 @@ class Install(ctk.CTk):
         self.open_folder_button.configure(state='disabled')
         self._clear_log()
         self._append_log(f'{mode_label} em: {destination}')
-        self.progress_counter.configure(text='Compilando projeto...')
+        self.progress_counter.configure(text='Preparando instalação...')
         self.progress_bar.configure(mode='indeterminate')
         self.progress_bar.start()
         threading.Thread(target=self._install_worker, args=(destination, is_update), daemon=True).start()
 
     def _workspace_root(self):
         return Path(__file__).resolve().parent
+
+    def _runtime_root(self):
+        if getattr(sys, 'frozen', False):
+            return Path(sys.executable).resolve().parent
+        return self._workspace_root()
 
     def _resolve_destination(self):
         selected_path = Path(self.installation_path).expanduser()
@@ -121,7 +126,7 @@ class Install(ctk.CTk):
         return selected_path
 
     def _fallback_destination(self):
-        return Path.home() / 'Passwords Manager'
+        return Path(system_path())
 
     def _prepare_destination_with_fallback(self, destination):
         try:
@@ -203,17 +208,55 @@ class Install(ctk.CTk):
         if return_code != 0:
             raise RuntimeError('Falha na compilação. Verifique os logs para mais detalhes.')
 
+    def _release_candidates(self):
+        candidates = [self._runtime_root() / 'release']
+
+        if getattr(sys, 'frozen', False):
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                candidates.append(Path(meipass) / 'release')
+
+        candidates.append(self._workspace_root() / 'release')
+
+        unique_candidates = []
+        seen = set()
+        for candidate in candidates:
+            normalized = str(candidate.resolve())
+            if normalized not in seen:
+                seen.add(normalized)
+                unique_candidates.append(candidate)
+
+        return unique_candidates
+
+    def _validate_release_structure(self, release_dir):
+        required_files = [
+            release_dir / 'passwords-manager.exe',
+            release_dir / 'uninstall' / 'uninstall.exe',
+        ]
+        missing = [str(file_path) for file_path in required_files if not file_path.exists()]
+        if missing:
+            raise FileNotFoundError(
+                'Estrutura de release incompleta. Arquivos ausentes: ' + ', '.join(missing)
+            )
+
     def _release_files(self):
-        release_dir = self._workspace_root() / 'release'
+        checked_paths = []
+        for release_dir in self._release_candidates():
+            checked_paths.append(str(release_dir))
+            if not release_dir.exists():
+                continue
 
-        if not release_dir.exists():
-            raise FileNotFoundError(f'Pasta de release não encontrada: {release_dir}')
+            files = [file_path for file_path in release_dir.rglob('*') if file_path.is_file()]
+            if not files:
+                continue
 
-        files = [file_path for file_path in release_dir.rglob('*') if file_path.is_file()]
-        if not files:
-            raise FileNotFoundError('Nenhum arquivo gerado foi encontrado na pasta release.')
+            self._validate_release_structure(release_dir)
+            return release_dir, files
 
-        return release_dir, files
+        raise FileNotFoundError(
+            'Pasta de release não encontrada ou incompleta. Caminhos verificados: '
+            + '; '.join(checked_paths)
+        )
 
     def _set_controls_state(self, state):
         self.install_button.configure(state=state)
@@ -265,10 +308,15 @@ class Install(ctk.CTk):
 
     def _install_worker(self, destination, is_update):
         try:
-            self.after(0, self._append_log, 'Iniciando build local...')
-            self._run_build_script()
-            self.after(0, self._append_log, 'Build concluído. Preparando cópia...')
-            release_dir, files = self._release_files()
+            self.after(0, self._append_log, 'Procurando arquivos de deploy pré-compilados...')
+            try:
+                release_dir, files = self._release_files()
+                self.after(0, self._append_log, f'Payload encontrado em: {release_dir}')
+            except FileNotFoundError:
+                self.after(0, self._append_log, 'Payload não encontrado. Iniciando build local...')
+                self._run_build_script()
+                self.after(0, self._append_log, 'Build concluído. Preparando cópia...')
+                release_dir, files = self._release_files()
 
             destination, used_fallback = self._prepare_destination_with_fallback(destination)
             self.last_installation_destination = str(destination)

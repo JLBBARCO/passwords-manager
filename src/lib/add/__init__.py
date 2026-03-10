@@ -1,10 +1,11 @@
 import json
 import os
 from src.lib.crypto import get_crypto_manager
+from src.lib.system import prepare_local_data_file
 
 class AddPassword:
     def __init__(self):
-        self.json_file = 'passwords.json'
+        self.json_file = str(prepare_local_data_file('passwords.json'))
         self.crypto = get_crypto_manager()
     
     def add_password(self, address, user, password):

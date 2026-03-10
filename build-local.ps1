@@ -51,13 +51,25 @@ Write-Host "✓ Limpeza concluída" -ForegroundColor Green
 
 # Compila o programa
 Write-Host ""
-Write-Host "Compilando programa com PyInstaller..." -ForegroundColor Yellow
+Write-Host "Compilando executáveis com PyInstaller..." -ForegroundColor Yellow
 python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=passwords-manager main.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "✗ Erro na compilação do executável principal" -ForegroundColor Red
+    exit 1
+}
+
+python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=uninstall uninstall.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "✗ Erro na compilação do desinstalador" -ForegroundColor Red
+    exit 1
+}
+
+python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=install-passwords-manager install.py
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "✓ Compilação concluída com sucesso!" -ForegroundColor Green
+    Write-Host "✓ Compilações concluídas com sucesso!" -ForegroundColor Green
 } else {
-    Write-Host "✗ Erro na compilação" -ForegroundColor Red
+    Write-Host "✗ Erro na compilação do instalador" -ForegroundColor Red
     exit 1
 }
 
@@ -65,20 +77,25 @@ if ($LASTEXITCODE -eq 0) {
 Write-Host ""
 Write-Host "Preparando arquivos de release..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path "release" | Out-Null
+New-Item -ItemType Directory -Force -Path "release\uninstall" | Out-Null
+New-Item -ItemType Directory -Force -Path "installer-package" | Out-Null
 Copy-Item "dist\passwords-manager.exe" "release\"
+Copy-Item "dist\uninstall.exe" "release\uninstall\uninstall.exe"
 Copy-Item "README.md" "release\"
 Copy-Item "LICENSE" "release\"
-Copy-Item "ENCRYPTION.md" "release\"
-# Fallback to old name if it exists
-if (!(Test-Path "ENCRYPTION.md") -and (Test-Path "CRIPTOGRAFIA.md")) {
+if (Test-Path "ENCRYPTION.md") {
+    Copy-Item "ENCRYPTION.md" "release\"
+} elseif (Test-Path "CRIPTOGRAFIA.md") {
     Copy-Item "CRIPTOGRAFIA.md" "release\ENCRYPTION.md"
 }
+Copy-Item "dist\install-passwords-manager.exe" "installer-package\"
+Copy-Item "release" "installer-package\release" -Recurse -Force
 Write-Host "✓ Arquivos preparados" -ForegroundColor Green
 
 # Cria arquivo ZIP
 Write-Host ""
 Write-Host "Criando arquivo ZIP..." -ForegroundColor Yellow
-Compress-Archive -Path "release\*" -DestinationPath "passwords-manager-windows.zip" -Force
+Compress-Archive -Path "installer-package\*" -DestinationPath "passwords-manager-windows.zip" -Force
 Write-Host "✓ ZIP criado: passwords-manager-windows.zip" -ForegroundColor Green
 
 # Exibe tamanho do arquivo
@@ -92,6 +109,8 @@ Write-Host "Arquivo gerado: passwords-manager-windows.zip" -ForegroundColor Whit
 Write-Host "Tamanho: $("{0:N2}" -f $zipSize) MB" -ForegroundColor White
 Write-Host ""
 Write-Host "Executável: release\passwords-manager.exe" -ForegroundColor White
+Write-Host "Desinstalador: release\uninstall\uninstall.exe" -ForegroundColor White
+Write-Host "Instalador: installer-package\install-passwords-manager.exe" -ForegroundColor White
 Write-Host ""
 Write-Host "Para testar o executável:" -ForegroundColor Yellow
 Write-Host "  .\release\passwords-manager.exe" -ForegroundColor Cyan
