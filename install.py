@@ -258,6 +258,229 @@ class Install(ctk.CTk):
             + '; '.join(checked_paths)
         )
 
+    def _start_menu_shortcut_path(self):
+        appdata = os.environ.get('APPDATA')
+        if not appdata:
+            raise EnvironmentError('APPDATA não encontrado para criar atalho no Menu Iniciar.')
+        return Path(appdata) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
+
+    def _create_start_menu_shortcuts(self, destination):
+        if os.name != 'nt':
+            return []
+
+        destination_path = Path(destination)
+        main_exe = destination_path / 'passwords-manager.exe'
+        uninstall_exe = destination_path / 'uninstall' / 'uninstall.exe'
+
+        if not main_exe.exists():
+            raise FileNotFoundError(f'Executável principal não encontrado para atalho: {main_exe}')
+
+        if not uninstall_exe.exists():
+            raise FileNotFoundError(f'Desinstalador não encontrado para atalho: {uninstall_exe}')
+
+        start_menu_dir = self._start_menu_shortcut_path()
+        start_menu_dir.mkdir(parents=True, exist_ok=True)
+
+        shortcuts = [
+            ('Passwords Manager.lnk', main_exe, 'Passwords Manager'),
+            ('Uninstall Passwords Manager.lnk', uninstall_exe, 'Uninstall Passwords Manager'),
+        ]
+
+        created_paths = []
+        for shortcut_name, target_exe, description in shortcuts:
+            shortcut_path = start_menu_dir / shortcut_name
+
+            shortcut_path_ps = str(shortcut_path).replace("'", "''")
+            target_exe_ps = str(target_exe).replace("'", "''")
+            working_dir_ps = str(destination_path).replace("'", "''")
+            description_ps = description.replace("'", "''")
+
+            script = (
+                "$shell = New-Object -ComObject WScript.Shell;"
+                f"$shortcut = $shell.CreateShortcut('{shortcut_path_ps}');"
+                f"$shortcut.TargetPath = '{target_exe_ps}';"
+                f"$shortcut.WorkingDirectory = '{working_dir_ps}';"
+                f"$shortcut.IconLocation = '{target_exe_ps},0';"
+                f"$shortcut.Description = '{description_ps}';"
+                "$shortcut.Save();"
+            )
+
+            result = subprocess.run(
+                ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if result.returncode != 0:
+                raise RuntimeError(
+                    'Falha ao criar atalho no Menu Iniciar: '
+                    + (result.stderr.strip() or result.stdout.strip() or 'erro desconhecido')
+                )
+
+            created_paths.append(str(shortcut_path))
+
+        return created_paths
+
+    def _register_windows_uninstall_entry(self, destination):
+        if os.name != 'nt':
+            return None
+
+        destination_path = Path(destination)
+        uninstall_exe = destination_path / 'uninstall' / 'uninstall.exe'
+        display_icon = destination_path / 'passwords-manager.exe'
+
+        if not uninstall_exe.exists():
+            raise FileNotFoundError(f'Desinstalador não encontrado para registro: {uninstall_exe}')
+
+        uninstall_string = f'"{uninstall_exe}"'
+        app_name = 'Passwords Manager'
+        publisher = 'JLBBARCO'
+        install_date = datetime.now().strftime('%Y%m%d')
+
+        reg_path = r'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PasswordsManager'
+
+        script = (
+            f"$path = '{reg_path}';"
+            "if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null };"
+            f"Set-ItemProperty -Path $path -Name 'DisplayName' -Value '{app_name}';"
+            f"Set-ItemProperty -Path $path -Name 'Publisher' -Value '{publisher}';"
+            f"Set-ItemProperty -Path $path -Name 'InstallLocation' -Value '{str(destination_path).replace("'", "''")}';"
+            f"Set-ItemProperty -Path $path -Name 'DisplayIcon' -Value '{str(display_icon).replace("'", "''")}';"
+            f"Set-ItemProperty -Path $path -Name 'UninstallString' -Value '{uninstall_string.replace("'", "''")}';"
+            f"Set-ItemProperty -Path $path -Name 'QuietUninstallString' -Value '{uninstall_string.replace("'", "''")}';"
+            "Set-ItemProperty -Path $path -Name 'NoModify' -Type DWord -Value 1;"
+            "Set-ItemProperty -Path $path -Name 'NoRepair' -Type DWord -Value 1;"
+            f"Set-ItemProperty -Path $path -Name 'InstallDate' -Value '{install_date}';"
+        )
+
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                'Falha ao registrar desinstalação no Windows: '
+                + (result.stderr.strip() or result.stdout.strip() or 'erro desconhecido')
+            )
+
+        return reg_path
+
+    def _linux_shortcut_dir(self):
+        return Path.home() / '.local' / 'share' / 'applications'
+
+    def _create_linux_desktop_shortcuts(self, destination):
+        desktop_dir = self._linux_shortcut_dir()
+        desktop_dir.mkdir(parents=True, exist_ok=True)
+
+        app_exec = Path(destination) / 'passwords-manager'
+        uninstall_exec = Path(destination) / 'uninstall' / 'uninstall.sh'
+
+        if not app_exec.exists():
+            return []
+
+        app_entry = desktop_dir / 'passwords-manager.desktop'
+        uninstall_entry = desktop_dir / 'passwords-manager-uninstall.desktop'
+
+        app_content = (
+            '[Desktop Entry]\n'
+            'Type=Application\n'
+            'Version=1.0\n'
+            'Name=Passwords Manager\n'
+            f'Exec="{app_exec}"\n'
+            'Terminal=false\n'
+            'Categories=Utility;Security;\n'
+        )
+
+        app_entry.write_text(app_content, encoding='utf-8')
+        created = [str(app_entry)]
+
+        if uninstall_exec.exists():
+            uninstall_content = (
+                '[Desktop Entry]\n'
+                'Type=Application\n'
+                'Version=1.0\n'
+                'Name=Uninstall Passwords Manager\n'
+                f'Exec="{uninstall_exec}"\n'
+                'Terminal=true\n'
+                'Categories=Utility;\n'
+            )
+            uninstall_entry.write_text(uninstall_content, encoding='utf-8')
+            created.append(str(uninstall_entry))
+
+        return created
+
+    def _create_macos_shortcuts(self, destination):
+        apps_dir = Path.home() / 'Applications'
+        apps_dir.mkdir(parents=True, exist_ok=True)
+
+        app_exec = Path(destination) / 'passwords-manager'
+        uninstall_exec = Path(destination) / 'uninstall' / 'uninstall.sh'
+
+        if not app_exec.exists():
+            return []
+
+        app_launcher = apps_dir / 'Passwords Manager.command'
+        app_launcher.write_text(f'#!/bin/bash\n"{app_exec}"\n', encoding='utf-8')
+        app_launcher.chmod(0o755)
+
+        created = [str(app_launcher)]
+
+        if uninstall_exec.exists():
+            uninstall_launcher = apps_dir / 'Uninstall Passwords Manager.command'
+            uninstall_launcher.write_text(f'#!/bin/bash\n"{uninstall_exec}"\n', encoding='utf-8')
+            uninstall_launcher.chmod(0o755)
+            created.append(str(uninstall_launcher))
+
+        return created
+
+    def _create_platform_shortcuts(self, destination):
+        if os.name == 'nt':
+            return self._create_start_menu_shortcuts(destination)
+
+        if sys.platform.startswith('linux'):
+            return self._create_linux_desktop_shortcuts(destination)
+
+        if sys.platform == 'darwin':
+            return self._create_macos_shortcuts(destination)
+
+        return []
+
+        shortcut_path = self._start_menu_shortcut_path()
+        shortcut_path.parent.mkdir(parents=True, exist_ok=True)
+
+        shortcut_path_ps = str(shortcut_path).replace("'", "''")
+        target_exe_ps = str(target_exe).replace("'", "''")
+        working_dir_ps = str(Path(destination)).replace("'", "''")
+
+        script = (
+            "$shell = New-Object -ComObject WScript.Shell;"
+            f"$shortcut = $shell.CreateShortcut('{shortcut_path_ps}');"
+            f"$shortcut.TargetPath = '{target_exe_ps}';"
+            f"$shortcut.WorkingDirectory = '{working_dir_ps}';"
+            f"$shortcut.IconLocation = '{target_exe_ps},0';"
+            "$shortcut.Description = 'Passwords Manager';"
+            "$shortcut.Save();"
+        )
+
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                'Falha ao criar atalho no Menu Iniciar: '
+                + (result.stderr.strip() or result.stdout.strip() or 'erro desconhecido')
+            )
+
+        return str(shortcut_path)
+
     def _set_controls_state(self, state):
         self.install_button.configure(state=state)
         self.cancel_button.configure(state=state)
@@ -276,7 +499,7 @@ class Install(ctk.CTk):
         action = 'copiado' if changed else 'inalterado'
         self.progress_counter.configure(text=f'Analisando {current}/{total}: {filename} ({action})')
 
-    def _on_install_success(self, destination, is_update, updated_files, skipped_files):
+    def _on_install_success(self, destination, is_update, updated_files, skipped_files, shortcuts=None):
         self.installing = False
         self._set_controls_state('normal')
         self.open_folder_button.configure(state='normal')
@@ -287,12 +510,19 @@ class Install(ctk.CTk):
         self._append_log(
             f'Processo concluído com sucesso. Copiados: {updated_files}. Inalterados: {skipped_files}.'
         )
+        if shortcuts:
+            for shortcut in shortcuts:
+                self._append_log(f'Atalho criado/atualizado: {shortcut}')
         status_text = 'atualizados' if is_update else 'instalados'
+        shortcuts_text = ''
+        if shortcuts:
+            shortcuts_text = '\nAtalhos criados:\n' + '\n'.join(shortcuts)
         messagebox.showinfo(
             program_name,
             (
                 f'Arquivos {status_text} em:\n{destination}\n\n'
                 f'Copiados: {updated_files}\nInalterados: {skipped_files}'
+                f'{shortcuts_text}'
             ),
         )
 
@@ -349,7 +579,29 @@ class Install(ctk.CTk):
 
                 self.after(0, self._update_copy_progress, index, total_files, relative_path.name, changed)
 
-            self.after(0, self._on_install_success, str(destination), is_update, updated_files, skipped_files)
+            shortcuts = []
+            self.after(0, self._append_log, 'Criando atalhos do sistema...')
+            try:
+                shortcuts = self._create_platform_shortcuts(destination)
+            except Exception as shortcut_error:
+                self.after(0, self._append_log, f'Aviso: {shortcut_error}')
+
+            if os.name == 'nt':
+                try:
+                    reg_path = self._register_windows_uninstall_entry(destination)
+                    self.after(0, self._append_log, f'Registro de desinstalação criado: {reg_path}')
+                except Exception as registry_error:
+                    self.after(0, self._append_log, f'Aviso: {registry_error}')
+
+            self.after(
+                0,
+                self._on_install_success,
+                str(destination),
+                is_update,
+                updated_files,
+                skipped_files,
+                shortcuts,
+            )
 
             if used_fallback:
                 self.after(

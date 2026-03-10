@@ -62,5 +62,56 @@ else
   chmod +x "${TARGET_DIR}/passwords-manager" || true
 fi
 
+cat > "${TARGET_DIR}/uninstall.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+echo "Removing ${INSTALL_DIR}..."
+rm -rf "${INSTALL_DIR}"
+echo "Uninstall completed."
+EOF
+chmod +x "${TARGET_DIR}/uninstall.sh"
+
+if [ "${OS_NAME}" = "Linux" ]; then
+  APP_DIR="${HOME}/.local/share/applications"
+  mkdir -p "${APP_DIR}"
+  cat > "${APP_DIR}/passwords-manager.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Passwords Manager
+Exec=${TARGET_DIR}/passwords-manager
+Terminal=false
+Categories=Utility;Security;
+EOF
+
+  cat > "${APP_DIR}/passwords-manager-uninstall.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Uninstall Passwords Manager
+Exec=${TARGET_DIR}/uninstall.sh
+Terminal=true
+Categories=Utility;
+EOF
+fi
+
+if [ "${OS_NAME}" = "Darwin" ]; then
+  APP_DIR="${HOME}/Applications"
+  mkdir -p "${APP_DIR}"
+
+  cat > "${APP_DIR}/Passwords Manager.command" <<EOF
+#!/bin/bash
+"${TARGET_DIR}/passwords-manager"
+EOF
+  chmod +x "${APP_DIR}/Passwords Manager.command"
+
+  cat > "${APP_DIR}/Uninstall Passwords Manager.command" <<EOF
+#!/bin/bash
+"${TARGET_DIR}/uninstall.sh"
+EOF
+  chmod +x "${APP_DIR}/Uninstall Passwords Manager.command"
+fi
+
 echo "Installed successfully."
 echo "Run: ${TARGET_DIR}/passwords-manager"

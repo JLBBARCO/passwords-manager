@@ -20,4 +20,14 @@ else
   rm -rf "${TARGET_DIR}"
 fi
 
+if [ "$(uname -s)" = "Linux" ]; then
+  rm -f "${HOME}/.local/share/applications/passwords-manager.desktop"
+  rm -f "${HOME}/.local/share/applications/passwords-manager-uninstall.desktop"
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  rm -f "${HOME}/Applications/Passwords Manager.command"
+  rm -f "${HOME}/Applications/Uninstall Passwords Manager.command"
+fi
+
 echo "Uninstall completed."
