@@ -2,16 +2,17 @@ import csv
 import json
 import os
 from src.lib.crypto import get_crypto_manager
+from src.lib.system import find_data_file, prepare_local_data_file
 
-def convertToCSV():
+def convertToCSV(csv_file=None, json_file=None):
     """
     Converte CSV para JSON com criptografia de senhas.
     Retorna True se bem-sucedido, False caso contrário.
     Exclui o arquivo CSV após conversão bem-sucedida.
     """
     try:
-        csv_file = 'passwords.csv'
-        json_file = 'passwords.json'
+        csv_file = str(csv_file or find_data_file('passwords.csv'))
+        json_file = str(json_file or prepare_local_data_file('passwords.json'))
         
         if not os.path.exists(csv_file):
             print(f"Arquivo {csv_file} não encontrado.")

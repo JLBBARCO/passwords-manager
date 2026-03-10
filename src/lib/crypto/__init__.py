@@ -1,18 +1,19 @@
 from cryptography.fernet import Fernet
 import os
+from src.lib.system import prepare_local_data_file
 
 
 class CryptoManager:
     """Gerencia a criptografia e descriptografia de senhas usando Fernet (AES)"""
     
-    def __init__(self, key_file='encryption.key'):
+    def __init__(self, key_file=None):
         """
         Inicializa o gerenciador de criptografia.
         
         Args:
             key_file: Nome do arquivo onde a chave será armazenada
         """
-        self.key_file = key_file
+        self.key_file = str(prepare_local_data_file(key_file or 'encryption.key'))
         self.key = self._load_or_generate_key()
         self.cipher = Fernet(self.key)
     

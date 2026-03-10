@@ -22,9 +22,10 @@ The workflow is triggered in the following situations:
 3. **Process**:
    - Installs dependencies from `requirements.txt`
    - Installs PyInstaller
-   - Compiles with PyInstaller (--onefile --noconsole)
+   - Compiles `main.py`, `uninstall.py` and `install.py` with PyInstaller (--onefile --noconsole)
    - Includes application icon
-   - Creates release structure with README, LICENSE and ENCRYPTION.md
+   - Creates release structure with `release/uninstall/uninstall.exe`
+   - Creates installer package with `install-passwords-manager.exe`
    - Compresses to ZIP file
    - Publishes to release
 
@@ -59,11 +60,10 @@ The workflow is triggered in the following situations:
 ### Windows
 
 - **File**: `passwords-manager-windows.zip`
-- **Content**:
-  - `passwords-manager.exe` - Main executable
-  - `README.md` - Documentation
-  - `LICENSE` - License
-  - `ENCRYPTION.md` - Encryption technical documentation
+- **Installer**: `install-passwords-manager.exe`
+- **Content main executable**: `passwords-manager.exe`
+- **Content uninstaller**: `uninstall/uninstall.exe`
+- **Content docs**: `README.md`, `LICENSE`, `ENCRYPTION.md`
 
 ### Linux
 
@@ -132,7 +132,13 @@ Each release automatically includes:
 
 1. Download `passwords-manager-windows.zip` from release
 2. Extract the ZIP file
-3. Run `passwords-manager.exe`
+3. Run `install-passwords-manager.exe`
+
+Alternative (after winget publication):
+
+```powershell
+winget install JLBBARCO.PasswordsManager
+```
 
 ### Linux (End User)
 
@@ -149,6 +155,12 @@ Each release automatically includes:
    ./passwords-manager
    ```
 
+Alternative installer script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/install-unix.sh | bash
+```
+
 ### macOS (End User)
 
 1. Download `passwords-manager-macos.tar.gz` from release
@@ -164,7 +176,13 @@ Each release automatically includes:
    ./passwords-manager
    ```
 
-   **Note**: On macOS, you may need to authorize the application execution in Security and Privacy settings.
+Alternative installer script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/install-unix.sh | bash
+```
+
+**Note**: On macOS, you may need to authorize the application execution in Security and Privacy settings.
 
 ## 🔧 Workflow Configuration
 

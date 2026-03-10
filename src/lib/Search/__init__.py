@@ -1,15 +1,16 @@
 import json
 import os
 from src.lib.crypto import get_crypto_manager
+from src.lib.system import find_data_file
 
 
 class Search:
     """Procura por uma query no arquivo `passwords.json` e retorna uma lista de tuplas
     (address, user, password) em `self.results`.
     """
-    def __init__(self, query: str, json_file: str = 'passwords.json'):
+    def __init__(self, query: str, json_file: str = None):
         self.query = (query or '').strip()
-        self.json_file = json_file
+        self.json_file = str(find_data_file(json_file or 'passwords.json'))
         self.results = []
         self.crypto = get_crypto_manager()
         self.search_passwords()

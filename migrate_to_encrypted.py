@@ -5,8 +5,7 @@ Este script criptografa todas as senhas existentes no arquivo passwords.json.
 Execute-o apenas UMA VEZ após instalar o sistema de criptografia.
 """
 
-import json
-import os
+from src.lib.external_libs import json, os
 from src.lib.crypto import get_crypto_manager
 
 

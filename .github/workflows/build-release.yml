@@ -31,27 +31,36 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build executable
+      - name: Build executables
         run: |
           python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=passwords-manager main.py
+          python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=uninstall uninstall.py
+          python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=install-passwords-manager install.py
 
       - name: Prepare release files
         run: |
           mkdir release
+          mkdir release\uninstall
+          mkdir installer-package
           copy dist\passwords-manager.exe release\
+          copy dist\uninstall.exe release\uninstall\uninstall.exe
           copy README.md release\
           copy LICENSE release\
-          copy ENCRYPTION.md release\ 2>nul || copy CRIPTOGRAFIA.md release\
+          copy ENCRYPTION.md release\ 2>nul || copy CRIPTOGRAFIA.md release\ENCRYPTION.md
+          copy dist\install-passwords-manager.exe installer-package\
+          xcopy release installer-package\release\ /E /I /Y
 
       - name: Create ZIP archive
         run: |
-          Compress-Archive -Path release\* -DestinationPath passwords-manager-windows.zip
+          Compress-Archive -Path installer-package\* -DestinationPath passwords-manager-windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: passwords-manager-windows
-          path: passwords-manager-windows.zip
+          path: |
+            passwords-manager-windows.zip
+            installer-package/install-passwords-manager.exe
 
   build-linux:
     runs-on: ubuntu-latest
@@ -213,8 +222,12 @@ jobs:
             **Branch:** ${{ github.ref_name }}
           files: |
             artifacts/passwords-manager-windows/passwords-manager-windows.zip
+            artifacts/passwords-manager-windows/install-passwords-manager.exe
             artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz
             artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz
+            scripts/install-unix.sh
+            scripts/uninstall-unix.sh
+            packaging/homebrew/passwords-manager.rb
           draft: false
           prerelease: false
         env:

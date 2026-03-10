@@ -1,9 +1,10 @@
 ﻿import json
 import os
+from src.lib.system import prepare_local_data_file
 
 class RemovePassword:
     def __init__(self):
-        self.json_file = 'passwords.json'
+        self.json_file = str(prepare_local_data_file('passwords.json'))
 
     def remove_password(self, address, user):
         """Remove password from JSON file by address and user"""
