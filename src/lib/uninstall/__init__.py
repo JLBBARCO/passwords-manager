@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import sys
 
-APP_FOLDER_NAME = 'Passwords Manager'
+from src.lib.system import APP_FOLDER_NAME, compatibility_installation_paths, path as default_install_root
 
 
 def normalize_installation_path(path_value):
@@ -15,14 +15,19 @@ def normalize_installation_path(path_value):
 
 
 def default_installation_path():
-	local_app_data = Path.home() / 'AppData' / 'Local'
-	env_local = Path(sys.executable).parent
-	if sys.platform.startswith('win'):
-		from os import environ
+	return Path(default_install_root())
 
-		if environ.get('LOCALAPPDATA'):
-			local_app_data = Path(environ['LOCALAPPDATA'])
-	return local_app_data / APP_FOLDER_NAME
+
+def installation_candidates():
+	paths = [normalize_installation_path(candidate) for candidate in compatibility_installation_paths()]
+	unique_paths = []
+	seen = set()
+	for candidate in paths:
+		normalized = str(candidate)
+		if normalized not in seen:
+			seen.add(normalized)
+			unique_paths.append(candidate)
+	return unique_paths
 
 
 def detect_installation_path(selected_path=None):
@@ -38,6 +43,10 @@ def detect_installation_path(selected_path=None):
 			possible = exe_dir
 		if possible.name.lower() == APP_FOLDER_NAME.lower():
 			return possible
+
+	for candidate in installation_candidates():
+		if candidate.exists():
+			return candidate
 
 	return default_installation_path()
 

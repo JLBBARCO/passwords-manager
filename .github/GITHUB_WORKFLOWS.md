@@ -40,7 +40,7 @@ This directory contains GitHub Actions workflows to automate builds and releases
 
 - Push to `main`: creates next patch tag automatically and triggers versioned release flow
 - Tag events (`v*`): versioned release for builds and distribution
-- Package publication: Winget + Homebrew for versioned tags
+- Package publication: Winget always, Homebrew only when tap repository is configured
 - Artifacts available for 90 days
 
 ## 🚀 How to Use
@@ -80,6 +80,9 @@ The workflow will create an official release with version `v1.0.0`.
 ### Environment Variables
 
 The workflow uses only `GITHUB_TOKEN` (automatic), no additional secrets needed.
+
+For Homebrew publishing, set `HOMEBREW_TAP_REPOSITORY` in workflow env (example: `JLBBARCO/homebrew-tap`).
+If the tap is private or restricted, use a PAT with repository access.
 
 ### Modify the Workflow
 

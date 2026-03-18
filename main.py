@@ -68,30 +68,32 @@ class App(ctk.CTk):
         super().__init__()
         self.title('Passwords Manager')
 
+        # Make the main window responsive
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
         self.password_loader = PasswordLoader(self)
 
         self.status_var = ctk.StringVar(value=self.password_loader.status_message)
 
-        self.main_frame = ctk.CTkFrame(self, width=250, height=250)
-        self.main_frame.grid(row=0, column=0, padx=10, pady=10)
+        self.textTitle = ctk.CTkLabel(self, textvariable=self.status_var)
+        self.textTitle.grid(row=0, column=0, columnspan=3, padx=padMain, pady=padMain, sticky="ew")
 
-        self.textTitle = ctk.CTkLabel(self.main_frame, textvariable=self.status_var)
-        self.textTitle.grid(row=0, column=0, columnspan=3, padx=padMain, pady=padMain)
-
-        self.SearchBar = ctk.CTkEntry(self.main_frame, placeholder_text='Search')
-        self.SearchBar.grid(row=1, column=0, columnspan=2, pady=padMain)
-        self.SearchButton = ctk.CTkButton(self.main_frame, text='Search', command=self.search)
-        self.SearchButton.grid(row=1, column=2, pady=padMain)
+        self.SearchBar = ctk.CTkEntry(self, placeholder_text='Search')
+        self.SearchBar.grid(row=1, column=0, columnspan=2, padx=padMain, pady=padMain, sticky="ew")
+        self.SearchButton = ctk.CTkButton(self, text='Search', command=self.search)
+        self.SearchButton.grid(row=1, column=2, padx=padMain, pady=padMain)
 
         # Table area with both vertical and horizontal scrolling
-        self.table_container = ctk.CTkFrame(self.main_frame)
+        self.table_container = ctk.CTkFrame(self)
         self.table_container.grid(row=2, column=0, columnspan=3, padx=padMain, pady=padMain, sticky="nsew")
 
         # Use the same background color as the table frame to avoid white canvas gaps
         table_bg = self._apply_appearance_mode(self.table_container.cget("fg_color"))
         self.table_canvas = tk.Canvas(
             self.table_container,
-            width=500,
             height=120,
             highlightthickness=0,
             bd=0,
@@ -115,6 +117,12 @@ class App(ctk.CTk):
         self.table_content = ctk.CTkFrame(self.table_canvas)
         self.table_window_id = self.table_canvas.create_window((0, 0), window=self.table_content, anchor="nw")
         self.table_content.bind("<Configure>", self._update_table_scrollregion)
+        self.table_canvas.bind("<Configure>", self._on_table_canvas_configure)
+
+        # Keep table columns expanding consistently
+        self.table_content.grid_columnconfigure(0, weight=1)
+        self.table_content.grid_columnconfigure(1, weight=1)
+        self.table_content.grid_columnconfigure(2, weight=1)
 
         # Keep compatibility with existing rendering code
         self.showTable = self.table_content
@@ -129,27 +137,29 @@ class App(ctk.CTk):
         self.loading_label = ctk.CTkLabel(self.showTable, text="Changing Data...")
         self.loading_label.grid(row=1, column=0, columnspan=3, padx=padMain, pady=padMain)
 
-        self.buttonRemove = ctk.CTkButton(self.main_frame, text='Remove', command=self.remove, state="disabled")
-        self.buttonAdd = ctk.CTkButton(self.main_frame, text='Add', command=self.add, state="disabled")
+        self.buttonRemove = ctk.CTkButton(self, text='Remove', command=self.remove, state="disabled")
+        self.buttonAdd = ctk.CTkButton(self, text='Add', command=self.add, state="disabled")
         self.buttonRemove.grid(row=3, column=0, padx=padMain, pady=padMain)
         self.buttonAdd.grid(row=3, column=2, padx=padMain, pady=padMain)
 
         self.areaGenerate = ctk.CTkFrame(self)
-        self.areaGenerate.grid(row=1, column=0, columnspan=3, padx=padMain, pady=padMain)
+        self.areaGenerate.grid(row=4, column=0, columnspan=3, padx=padMain, pady=padMain, sticky="ew")
+        # Keep action buttons centered while the container adapts
+        self.areaGenerate.grid_columnconfigure(0, weight=1)
+        self.areaGenerate.grid_columnconfigure(1, weight=0)
+        self.areaGenerate.grid_columnconfigure(2, weight=1)
         self.buttonGenerateSimplePassword = ctk.CTkButton(
             self.areaGenerate, text='Generate a Simple Password', command=self.simplePassword)
-        self.buttonGenerateSimplePassword.grid(row=0, column=0, padx=padMain, pady=padMain)
+        self.buttonGenerateSimplePassword.grid(row=0, column=1, padx=padMain, pady=padMain)
         self.buttonGenerateComplexPassword = ctk.CTkButton(
             self.areaGenerate, text='Generate a Complex Password', command=self.complexPassword)
-        self.buttonGenerateComplexPassword.grid(row=1, column=0, padx=padMain, pady=padMain)
-
-        self.buttonCheckUpdate = ctk.CTkButton(
-            self.areaGenerate, text='Check Updates', command=self.check_updates_and_prompt)
-        self.buttonCheckUpdate.grid(row=2, column=0, padx=padMain, pady=padMain)
+        self.buttonGenerateComplexPassword.grid(row=1, column=1, padx=padMain, pady=padMain)
 
         # Non-GUI generation controls removed to avoid overlapping widgets
 
         self.areaPrintPassword = None
+
+        self._bind_table_mousewheel_events()
 
         self.check_loading_status()
 
@@ -226,6 +236,57 @@ class App(ctk.CTk):
 
     def _update_table_scrollregion(self, _event=None):
         self.table_canvas.configure(scrollregion=self.table_canvas.bbox("all"))
+
+    def _on_table_canvas_configure(self, event):
+        # Expand with the window, but keep horizontal scroll for wide content
+        required_width = self.table_content.winfo_reqwidth()
+        self.table_canvas.itemconfigure(self.table_window_id, width=max(event.width, required_width))
+        self._update_table_scrollregion()
+
+    def _bind_table_mousewheel_events(self):
+        for widget in (self.table_container, self.table_canvas, self.table_content):
+            widget.bind("<Enter>", self._on_table_mouse_enter)
+            widget.bind("<Leave>", self._on_table_mouse_leave)
+
+    def _on_table_mouse_enter(self, _event=None):
+        self.bind_all("<MouseWheel>", self._on_table_mousewheel)
+        self.bind_all("<Shift-MouseWheel>", self._on_table_shift_mousewheel)
+        self.bind_all("<Button-4>", self._on_table_mousewheel)
+        self.bind_all("<Button-5>", self._on_table_mousewheel)
+        self.bind_all("<Shift-Button-4>", self._on_table_shift_mousewheel)
+        self.bind_all("<Shift-Button-5>", self._on_table_shift_mousewheel)
+
+    def _on_table_mouse_leave(self, _event=None):
+        self.unbind_all("<MouseWheel>")
+        self.unbind_all("<Shift-MouseWheel>")
+        self.unbind_all("<Button-4>")
+        self.unbind_all("<Button-5>")
+        self.unbind_all("<Shift-Button-4>")
+        self.unbind_all("<Shift-Button-5>")
+
+    def _on_table_mousewheel(self, event):
+        if getattr(event, 'num', None) == 4:
+            step = -1
+        elif getattr(event, 'num', None) == 5:
+            step = 1
+        else:
+            delta = int(getattr(event, 'delta', 0))
+            if delta == 0:
+                return
+            step = -int(delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
+        self.table_canvas.yview_scroll(step, "units")
+
+    def _on_table_shift_mousewheel(self, event):
+        if getattr(event, 'num', None) == 4:
+            step = -1
+        elif getattr(event, 'num', None) == 5:
+            step = 1
+        else:
+            delta = int(getattr(event, 'delta', 0))
+            if delta == 0:
+                return
+            step = -int(delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
+        self.table_canvas.xview_scroll(step, "units")
 
     def _copy_table_value(self, value):
         from src.lib.copy import Copy
@@ -326,7 +387,7 @@ class App(ctk.CTk):
         if self.areaPrintPassword and self.areaPrintPassword.winfo_exists():
             self.areaPrintPassword.destroy()
         self.areaPrintPassword = ctk.CTkFrame(self.areaGenerate)
-        self.areaPrintPassword.grid(row=0, rowspan=2, column=1, padx=padMain, pady=padMain)
+        self.areaPrintPassword.grid(row=0, rowspan=2, column=2, padx=padMain, pady=padMain, sticky="w")
         ctk.CTkLabel(self.areaPrintPassword, text=password, fg_color='gray30', padx=10, pady=5)\
             .grid(row=0, column=0, columnspan=2, padx=5, pady=5)
         ctk.CTkButton(self.areaPrintPassword, text='Copy', width=60,
