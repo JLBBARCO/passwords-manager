@@ -7,7 +7,8 @@ This directory contains GitHub Actions workflows to automate builds and releases
 ```text
 .github/
 └── workflows/
-    └── build-release.yml    # Main build and release workflow
+   ├── build-release.yml        # Main build and release workflow
+   └── build-android-apk.yml    # Android APK workflow with readiness checks
 ```
 
 ## 🔄 Available Workflows
@@ -42,6 +43,31 @@ This directory contains GitHub Actions workflows to automate builds and releases
 - Tag events (`v*`): versioned release for builds and distribution
 - Package publication: Winget always, Homebrew only when tap repository is configured
 - Artifacts available for 90 days
+
+### build-android-apk.yml
+
+**Description**: Attempts automatic Android APK generation when Android prerequisites are present.
+
+**Triggers**:
+
+- Release published
+- Manual execution via GitHub Actions UI
+
+**Jobs**:
+
+1. **android-readiness**: Validates if Android build is possible
+   - Checks for `buildozer.spec`
+   - Checks for `android/main.py`
+   - Validates `source.dir = android` in `buildozer.spec`
+   - Writes readiness reason to workflow summary
+
+2. **build-android-apk**: Builds APK only when readiness checks pass
+   - Installs Buildozer toolchain
+   - Runs `buildozer android debug`
+   - Uploads generated APK artifact
+   - Attaches APK to release when trigger is release event
+
+3. **android-not-ready**: Completes workflow with clear skip reason
 
 ## 🚀 How to Use
 

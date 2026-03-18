@@ -193,6 +193,38 @@ jobs:
         run: |
           Compress-Archive -Path installer-package\* -DestinationPath passwords-manager-windows.zip
 
+      - name: Validate Windows payload and shortcut generation
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $releaseRoot = Join-Path $PWD 'installer-package\release'
+          $mainExe = Join-Path $releaseRoot 'passwords-manager.exe'
+          $uninstallExe = Join-Path $releaseRoot 'uninstall\uninstall.exe'
+          $installerExe = Join-Path $PWD 'installer-package\install-passwords-manager.exe'
+
+          if (!(Test-Path $mainExe)) { throw "Missing payload file: $mainExe" }
+          if (!(Test-Path $uninstallExe)) { throw "Missing payload file: $uninstallExe" }
+          if (!(Test-Path $installerExe)) { throw "Missing installer file: $installerExe" }
+
+          $testShortcutDir = Join-Path $env:RUNNER_TEMP 'passwords-manager-shortcut-validation'
+          New-Item -ItemType Directory -Path $testShortcutDir -Force | Out-Null
+
+          $shortcutPath = Join-Path $testShortcutDir 'Passwords Manager.lnk'
+          $shell = New-Object -ComObject WScript.Shell
+          $shortcut = $shell.CreateShortcut($shortcutPath)
+          $shortcut.TargetPath = $mainExe
+          $shortcut.WorkingDirectory = $releaseRoot
+          $shortcut.IconLocation = "$mainExe,0"
+          $shortcut.Description = 'Passwords Manager'
+          $shortcut.Save()
+
+          if (!(Test-Path $shortcutPath)) {
+            throw "Shortcut was not created during validation: $shortcutPath"
+          }
+
+          Remove-Item -Path $testShortcutDir -Recurse -Force
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -455,14 +487,55 @@ jobs:
             echo "Winget package does not exist for ${IDENTIFIER}. Skipping automatic publish."
           fi
 
+      - name: Validate Winget token
+        if: steps.winget_check.outputs.exists == 'true'
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -z "${WINGET_TOKEN}" ]]; then
+            echo "WINGET_TOKEN secret is required for winget-releaser." >&2
+            exit 1
+          fi
+
+      - name: Debug release assets for Winget
+        if: steps.winget_check.outputs.exists == 'true'
+        shell: bash
+        run: |
+          RELEASE_TAG="${{ needs.prepare-release-context.outputs.release_tag }}"
+          API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}"
+          echo "Checking release assets for tag: ${RELEASE_TAG}"
+          curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" "${API_URL}" \
+            | python -c "import sys, json; data=json.load(sys.stdin); assets=data.get('assets', []); print('Assets found:' if assets else 'No assets found'); [print(f\"- {a.get('name')}\") for a in assets]"
+
+      - name: Ensure installer asset exists for Winget
+        if: steps.winget_check.outputs.exists == 'true'
+        shell: bash
+        run: |
+          RELEASE_TAG="${{ needs.prepare-release-context.outputs.release_tag }}"
+          API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}"
+
+          ASSET_NAMES=$(curl -fsSL -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" "${API_URL}" \
+            | python -c "import sys, json; data=json.load(sys.stdin); print('\\n'.join(a.get('name','') for a in data.get('assets', [])))")
+
+          echo "Release assets evaluated for Winget:"
+          echo "${ASSET_NAMES}"
+
+          if ! echo "${ASSET_NAMES}" | grep -Eq '^install-passwords-manager\.exe$'; then
+            echo "Required Winget installer asset not found: install-passwords-manager.exe" >&2
+            exit 1
+          fi
+
       - name: Publish to winget
         if: steps.winget_check.outputs.exists == 'true'
         uses: vedantmgoyal2009/winget-releaser@v2
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.WINGET_TOKEN }}
           identifier: ${{ needs.prepare-release-context.outputs.winget_identifier }}
-          installers-regex: 'install-passwords-manager\.exe$'
+          installers-regex: '^install-passwords-manager\.exe$'
           release-tag: ${{ needs.prepare-release-context.outputs.release_tag }}
+          release-repository: ${{ github.repository }}
+          fork-user: ${{ github.repository_owner }}
 
       - name: Inform Winget bootstrap requirement
         if: steps.winget_check.outputs.exists != 'true'

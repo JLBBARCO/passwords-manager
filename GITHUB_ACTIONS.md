@@ -2,7 +2,8 @@
 
 ## 📋 Overview
 
-This repository has an automated GitHub Actions workflow that compiles Password Manager for Windows, Linux, and macOS, packages files, and automatically publishes to Releases.
+This repository has automated GitHub Actions workflows that compile Password Manager for Windows, Linux, and macOS, package files, and automatically publish to Releases.
+It also includes an Android APK workflow with readiness checks.
 
 ## 🔄 When the Workflow is Executed
 
@@ -54,6 +55,18 @@ The workflow is triggered in the following situations:
    - Sets execution permissions
    - Compresses to TAR.GZ file
    - Publishes to release
+
+### Android APK Workflow
+
+1. **Environment**: `ubuntu-latest`
+2. **Build Tool**: Buildozer (`buildozer android debug`)
+3. **Safety checks before build**:
+   - Requires `buildozer.spec` in repository root
+   - Requires `android/main.py` as Android entry point
+   - Validates `source.dir = android` in `buildozer.spec`
+4. **Output**:
+   - APK artifact upload
+   - APK attachment to release when release trigger is used
 
 ## 📦 Generated Files
 
@@ -185,6 +198,8 @@ curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scr
 ## 🔧 Workflow Configuration
 
 The workflow is located at: `.github/workflows/build-release.yml`
+
+Android workflow: `.github/workflows/build-android-apk.yml`
 
 ### Required Permissions
 

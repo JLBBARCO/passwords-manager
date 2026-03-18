@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 from src.lib.system import APP_FOLDER_NAME, compatibility_installation_paths, path as default_install_root
+from src.lib.windows_shortcuts import remove_windows_shortcuts
 
 
 def normalize_installation_path(path_value):
@@ -83,17 +84,12 @@ def _remove_windows_integrations():
 	if os_name() != 'windows':
 		return
 
-	appdata = None
-	try:
-		from os import environ
-		appdata = environ.get('APPDATA')
-	except Exception:
-		appdata = None
-
-	if appdata:
-		programs_dir = Path(appdata) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
-		for shortcut_name in ('Passwords Manager.lnk', 'Uninstall Passwords Manager.lnk'):
-			(programs_dir / shortcut_name).unlink(missing_ok=True)
+	remove_windows_shortcuts(
+		(
+			'Passwords Manager.lnk',
+			'Uninstall Passwords Manager.lnk',
+		)
+	)
 
 	reg_path = r'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PasswordsManager'
 	script = f"if (Test-Path '{reg_path}') {{ Remove-Item -Path '{reg_path}' -Recurse -Force }}"

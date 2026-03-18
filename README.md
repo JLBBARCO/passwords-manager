@@ -5,6 +5,7 @@
 ![Passwords Manager UI](src/assets/img/thumbnail.webp)
 
 [![Build and Release](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-release.yml/badge.svg)](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-release.yml)
+[![Build Android APK](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-android-apk.yml/badge.svg)](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-android-apk.yml)
 [![Latest Release](https://img.shields.io/github/v/release/JLBBARCO/passwords-manager?include_prereleases&label=latest)](https://github.com/JLBBARCO/passwords-manager/releases/latest)
 [![License](https://img.shields.io/github/license/JLBBARCO/passwords-manager)](LICENSE)
 
@@ -154,6 +155,28 @@ Beta channel formula (published from `develop`):
 brew tap JLBBARCO/homebrew-tap
 brew install passwords-manager-beta
 ```
+
+### Android (APK)
+
+An automatic workflow for APK generation is now available at `.github/workflows/build-android-apk.yml`.
+
+Current project status:
+
+- Android mobile UI created with Kivy in `android/main.py`
+- Build configuration created in `buildozer.spec`
+- Android now includes local password persistence (`save`, `list`, `remove`) via `android/storage.py`
+- Encryption is enabled when `cryptography` is available in the runtime; otherwise it falls back to plain text for compatibility
+- The workflow builds APK automatically when these files are present and valid
+
+Current limitation:
+
+1. The APK currently implements a mobile subset of desktop features
+
+To migrate full functionality to Android, next steps are:
+
+1. Add search/filter and password generator flows to the Android UI
+2. Sync advanced desktop flows (import/export and migration controls)
+3. Add Android-specific UX flows (secure clipboard behavior, share intents, backup/restore)
 
 ### � Pre-Compiled Executables
 
