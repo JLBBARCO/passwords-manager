@@ -376,6 +376,7 @@ jobs:
   build-android-apk:
     needs: [prepare-release-context]
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: read
       actions: read
@@ -409,28 +410,27 @@ jobs:
           fi
 
           if [[ -z "${SPEC_PATH}" ]]; then
-            cat > buildozer.spec << 'EOF'
-            [app]
-            title = Passwords Manager
-            package.name = passwordsmanager
-            package.domain = com.jlbbarco
-            source.dir = android
-            source.include_exts = py,png,jpg,jpeg,kv,atlas
-            version = 0.0.0
-            requirements = python3,kivy==2.3.0
-            orientation = portrait
-            fullscreen = 0
-            android.permissions = INTERNET
-            android.api = 33
-            android.minapi = 24
-            android.ndk = 25b
-            android.archs = arm64-v8a,armeabi-v7a
-
-            [buildozer]
-            log_level = 2
-            warn_on_root = 1
-            EOF
-            sed -i 's/^            //' buildozer.spec
+            printf '%s\n' \
+              '[app]' \
+              'title = Passwords Manager' \
+              'package.name = passwordsmanager' \
+              'package.domain = com.jlbbarco' \
+              'source.dir = android' \
+              'source.include_exts = py,png,jpg,jpeg,kv,atlas' \
+              'version = 0.0.0' \
+              'requirements = python3,kivy==2.3.0' \
+              'orientation = portrait' \
+              'fullscreen = 0' \
+              'android.permissions = INTERNET' \
+              'android.api = 33' \
+              'android.minapi = 24' \
+              'android.ndk = 25b' \
+              'android.archs = arm64-v8a,armeabi-v7a' \
+              '' \
+              '[buildozer]' \
+              'log_level = 2' \
+              'warn_on_root = 1' \
+              > buildozer.spec
             SPEC_PATH="buildozer.spec"
             SPEC_DIR="."
             echo "buildozer.spec not found. Generated fallback buildozer.spec at repository root."
@@ -487,14 +487,7 @@ jobs:
           path: artifacts/*.apk
 
   create-release:
-    needs:
-      [
-        prepare-release-context,
-        build-windows,
-        build-linux,
-        build-macos,
-        build-android-apk,
-      ]
+    needs: [prepare-release-context, build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -530,8 +523,10 @@ jobs:
           shopt -s nullglob
           APK_FILES=(artifacts/passwords-manager-android-apk/*.apk)
           if [[ ${#APK_FILES[@]} -eq 0 ]]; then
-            echo "Missing release asset: artifacts/passwords-manager-android-apk/*.apk" >&2
-            exit 1
+            echo "Android APK not found. Release will be created without APK."
+            echo "Android APK not found. Release was created with desktop artifacts only." >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'Android APK assets found: %s\n' "${APK_FILES[@]}"
           fi
 
       - name: Get version info
@@ -585,12 +580,35 @@ jobs:
             artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz
             artifacts/passwords-manager-linux/passwords-manager-x86_64.AppImage
             artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz
-            artifacts/passwords-manager-android-apk/*.apk
             scripts/install-unix.sh
             scripts/uninstall-unix.sh
             packaging/homebrew/passwords-manager.rb
           draft: false
           prerelease: ${{ startsWith(steps.version.outputs.version, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Android APK artifact presence
+        id: android_apk
+        shell: bash
+        run: |
+          shopt -s nullglob
+          APK_FILES=(artifacts/passwords-manager-android-apk/*.apk)
+          if [[ ${#APK_FILES[@]} -gt 0 ]]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf 'Android APK files to attach: %s\n' "${APK_FILES[@]}"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No Android APK files available to attach in this run."
+          fi
+
+      - name: Attach Android APK to existing release
+        if: steps.android_apk.outputs.found == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          files: |
+            artifacts/passwords-manager-android-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
