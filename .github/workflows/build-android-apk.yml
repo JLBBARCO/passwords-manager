@@ -98,45 +98,74 @@ jobs:
         run: |
           if [[ -f "buildozer.spec" || -f "android/buildozer.spec" ]]; then
             echo "buildozer.spec found"
-            exit 0
+          else
+            if [[ ! -f "android/main.py" ]]; then
+              echo "android/main.py not found" >&2
+              exit 1
+            fi
+
+            printf '%s\n' \
+              '[app]' \
+              'title = Passwords Manager' \
+              'package.name = passwordsmanager' \
+              'package.domain = com.jlbbarco' \
+              'source.dir = android' \
+              'source.include_exts = py,png,jpg,jpeg,kv,atlas' \
+              'version = 0.0.0' \
+              'requirements = python3,kivy==2.3.0' \
+              'orientation = portrait' \
+              'fullscreen = 0' \
+              'android.permissions = INTERNET' \
+              'android.api = 33' \
+              'android.minapi = 24' \
+              'android.ndk = 25b' \
+              'android.archs = arm64-v8a,armeabi-v7a' \
+              '' \
+              '[buildozer]' \
+              'log_level = 2' \
+              'warn_on_root = 1' \
+              > buildozer.spec
+
+            echo "Generated fallback buildozer.spec at repository root"
           fi
 
-          if [[ ! -f "android/main.py" ]]; then
-            echo "android/main.py not found" >&2
-            exit 1
+          SPEC_PATH="buildozer.spec"
+          if [[ -f "android/buildozer.spec" ]]; then
+            SPEC_PATH="android/buildozer.spec"
           fi
-
-          printf '%s\n' \
-            '[app]' \
-            'title = Passwords Manager' \
-            'package.name = passwordsmanager' \
-            'package.domain = com.jlbbarco' \
-            'source.dir = android' \
-            'source.include_exts = py,png,jpg,jpeg,kv,atlas' \
-            'version = 0.0.0' \
-            'requirements = python3,kivy==2.3.0' \
-            'orientation = portrait' \
-            'fullscreen = 0' \
-            'android.permissions = INTERNET' \
-            'android.api = 33' \
-            'android.minapi = 24' \
-            'android.ndk = 25b' \
-            'android.archs = arm64-v8a,armeabi-v7a' \
-            '' \
-            '[buildozer]' \
-            'log_level = 2' \
-            'warn_on_root = 1' \
-            > buildozer.spec
-
-          echo "Generated fallback buildozer.spec at repository root"
+          if ! grep -qE "^android\.accept_sdk_license[[:space:]]*=[[:space:]]*True$" "${SPEC_PATH}"; then
+            echo "android.accept_sdk_license = True" >> "${SPEC_PATH}"
+          fi
 
       - name: Build APK (debug)
         shell: bash
         run: |
-          if [[ "${{ needs.android-readiness.outputs.spec_dir }}" == "android" ]]; then
-            (cd android && buildozer android debug)
-          else
-            buildozer android debug
+          SPEC_DIR="${{ needs.android-readiness.outputs.spec_dir }}"
+
+          run_build() {
+            if [[ "${SPEC_DIR}" == "android" ]]; then
+              (cd android && buildozer android debug)
+            else
+              buildozer android debug
+            fi
+          }
+
+          accept_android_licenses() {
+            SDKMANAGER_PATH=$(find "$HOME/.buildozer" -type f -path "*/android-sdk/*/bin/sdkmanager" | head -n 1 || true)
+            if [[ -z "${SDKMANAGER_PATH}" ]]; then
+              echo "sdkmanager not found yet under ~/.buildozer; skipping proactive license acceptance."
+              return 0
+            fi
+
+            yes | "${SDKMANAGER_PATH}" --licenses >/dev/null || true
+            yes | "${SDKMANAGER_PATH}" --update >/dev/null || true
+            yes | "${SDKMANAGER_PATH}" "platform-tools" "platforms;android-33" "build-tools;33.0.2" >/dev/null || true
+          }
+
+          if ! run_build; then
+            echo "First Android build attempt failed. Accepting Android SDK licenses and retrying once..."
+            accept_android_licenses
+            run_build
           fi
 
       - name: Collect APK outputs
