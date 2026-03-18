@@ -36,14 +36,17 @@ jobs:
           elif [[ -f "android/buildozer.spec" ]]; then
             SPEC_PATH="android/buildozer.spec"
             SPEC_DIR="android"
-          else
-            READY=false
-            REASON="buildozer.spec not found (expected at repository root or android/buildozer.spec)"
           fi
 
           if [[ ! -f "android/main.py" ]]; then
             READY=false
             REASON="android/main.py not found. Add an Android entry point for Kivy."
+          fi
+
+          if [[ "${READY}" == "true" ]] && [[ -z "${SPEC_PATH}" ]]; then
+            SPEC_PATH="buildozer.spec"
+            SPEC_DIR="."
+            REASON="buildozer.spec missing, fallback spec will be generated during build."
           fi
 
           if [[ "${READY}" == "true" ]] && ! grep -qE "^source\.dir[[:space:]]*=[[:space:]]*(android|\.)$" "${SPEC_PATH}"; then
@@ -89,6 +92,44 @@ jobs:
 
           python -m pip install --upgrade pip
           pip install buildozer==1.5.0 cython==0.29.36
+
+      - name: Ensure buildozer spec exists
+        shell: bash
+        run: |
+          if [[ -f "buildozer.spec" || -f "android/buildozer.spec" ]]; then
+            echo "buildozer.spec found"
+            exit 0
+          fi
+
+          if [[ ! -f "android/main.py" ]]; then
+            echo "android/main.py not found" >&2
+            exit 1
+          fi
+
+          cat > buildozer.spec << 'EOF'
+          [app]
+          title = Passwords Manager
+          package.name = passwordsmanager
+          package.domain = com.jlbbarco
+          source.dir = android
+          source.include_exts = py,png,jpg,jpeg,kv,atlas
+          version = 0.0.0
+          requirements = python3,kivy==2.3.0
+          orientation = portrait
+          fullscreen = 0
+          android.permissions = INTERNET
+          android.api = 33
+          android.minapi = 24
+          android.ndk = 25b
+          android.archs = arm64-v8a,armeabi-v7a
+
+          [buildozer]
+          log_level = 2
+          warn_on_root = 1
+          EOF
+          sed -i 's/^          //' buildozer.spec
+
+          echo "Generated fallback buildozer.spec at repository root"
 
       - name: Build APK (debug)
         shell: bash
