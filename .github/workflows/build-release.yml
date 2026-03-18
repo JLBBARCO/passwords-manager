@@ -392,8 +392,17 @@ jobs:
       - name: Validate Android build inputs
         shell: bash
         run: |
-          if [[ ! -f "buildozer.spec" ]]; then
-            echo "buildozer.spec not found at repository root" >&2
+          SPEC_PATH=""
+          SPEC_DIR="."
+
+          if [[ -f "buildozer.spec" ]]; then
+            SPEC_PATH="buildozer.spec"
+            SPEC_DIR="."
+          elif [[ -f "android/buildozer.spec" ]]; then
+            SPEC_PATH="android/buildozer.spec"
+            SPEC_DIR="android"
+          else
+            echo "buildozer.spec not found (expected at repository root or android/buildozer.spec)" >&2
             exit 1
           fi
 
@@ -402,10 +411,13 @@ jobs:
             exit 1
           fi
 
-          if ! grep -qE "^source\.dir[[:space:]]*=[[:space:]]*android$" buildozer.spec; then
-            echo "buildozer.spec must contain: source.dir = android" >&2
+          if ! grep -qE "^source\.dir[[:space:]]*=[[:space:]]*(android|\.)$" "${SPEC_PATH}"; then
+            echo "buildozer.spec must contain: source.dir = android or source.dir = ." >&2
             exit 1
           fi
+
+          echo "Using spec: ${SPEC_PATH}"
+          echo "SPEC_DIR=${SPEC_DIR}" >> "$GITHUB_ENV"
 
       - name: Install Android build dependencies
         shell: bash
@@ -423,15 +435,22 @@ jobs:
       - name: Build APK (debug)
         shell: bash
         run: |
-          buildozer android debug
+          if [[ "${SPEC_DIR}" == "android" ]]; then
+            (cd android && buildozer android debug)
+          else
+            buildozer android debug
+          fi
 
       - name: Verify APK output
         shell: bash
         run: |
+          mkdir -p artifacts
+          find . -type f -path "*/bin/*.apk" -exec cp {} artifacts/ \;
+
           shopt -s nullglob
-          APK_FILES=(bin/*.apk)
+          APK_FILES=(artifacts/*.apk)
           if [[ ${#APK_FILES[@]} -eq 0 ]]; then
-            echo "No APK file found in bin/ after build" >&2
+            echo "No APK file found in */bin/ after build" >&2
             exit 1
           fi
           printf 'APK generated: %s\n' "${APK_FILES[@]}"
@@ -440,7 +459,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: passwords-manager-android-apk
-          path: bin/*.apk
+          path: artifacts/*.apk
 
   create-release:
     needs:
