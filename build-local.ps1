@@ -16,17 +16,17 @@ try {
 }
 
 # Cria ambiente virtual se não existir
-if (-not (Test-Path "venv")) {
+if (-not (Test-Path ".venv")) {
     Write-Host ""
     Write-Host "Criando ambiente virtual..." -ForegroundColor Yellow
-    python -m venv venv
+    python -m venv .venv
     Write-Host "✓ Ambiente virtual criado" -ForegroundColor Green
 }
 
 # Ativa ambiente virtual
 Write-Host ""
 Write-Host "Ativando ambiente virtual..." -ForegroundColor Yellow
-& "venv\Scripts\Activate.ps1"
+& ".venv\Scripts\Activate.ps1"
 
 # Atualiza pip
 Write-Host ""

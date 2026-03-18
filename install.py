@@ -1,5 +1,13 @@
 import customtkinter as ctk
-from src.lib.system import path as system_path, select_installation_directory
+from src.lib.system import (
+    DATA_FILENAMES,
+    compatibility_installation_paths,
+    local_data_path,
+    migrate_legacy_data_files,
+    path as system_path,
+    select_installation_directory,
+)
+from src.lib.uninstall import run_uninstall
 from pathlib import Path
 import hashlib
 import os
@@ -96,7 +104,7 @@ class Install(ctk.CTk):
         destination = self._resolve_destination()
 
         self.last_installation_destination = str(destination)
-        is_update = self._is_existing_installation(destination)
+        is_update = self._is_existing_installation(destination) or self._has_legacy_installation()
         mode_label = 'Atualizando' if is_update else 'Instalando'
 
         self.installing = True
@@ -128,6 +136,19 @@ class Install(ctk.CTk):
     def _fallback_destination(self):
         return Path(system_path())
 
+    def _legacy_installation_paths(self):
+        destination = self._resolve_destination()
+        legacy_paths = []
+        for candidate in compatibility_installation_paths():
+            candidate_path = Path(candidate)
+            try:
+                if candidate_path.resolve() == destination.resolve():
+                    continue
+            except Exception:
+                pass
+            legacy_paths.append(candidate_path)
+        return legacy_paths
+
     def _prepare_destination_with_fallback(self, destination):
         try:
             destination.mkdir(parents=True, exist_ok=True)
@@ -135,6 +156,10 @@ class Install(ctk.CTk):
             return destination, False
         except PermissionError:
             fallback = self._fallback_destination()
+            if fallback.resolve() == destination.resolve():
+                raise PermissionError(
+                    'Sem permissão para instalar na pasta configurada. Execute o instalador com privilégios elevados.'
+                )
             fallback.mkdir(parents=True, exist_ok=True)
             self._probe_destination_write(fallback)
             return fallback, True
@@ -169,6 +194,63 @@ class Install(ctk.CTk):
             return True
 
         return any(destination.iterdir())
+
+    def _has_legacy_installation(self):
+        for legacy_path in self._legacy_installation_paths():
+            if not legacy_path.exists():
+                continue
+
+            legacy_executable = legacy_path / 'passwords-manager.exe'
+            if legacy_executable.exists():
+                return True
+
+            if any(legacy_path.iterdir()):
+                return True
+
+        return False
+
+    def _migrate_legacy_installation(self, destination):
+        migrated_files, skipped_files = migrate_legacy_data_files(DATA_FILENAMES)
+        uninstall_results = []
+
+        if migrated_files:
+            self.after(
+                0,
+                self._append_log,
+                'Arquivos migrados para dados do usuário: ' + ', '.join(Path(path).name for path in migrated_files),
+            )
+        if skipped_files:
+            self.after(
+                0,
+                self._append_log,
+                'Arquivos de dados já existentes foram preservados: '
+                + ', '.join(Path(path).name for path in skipped_files),
+            )
+
+        for legacy_path in self._legacy_installation_paths():
+            if not legacy_path.exists():
+                continue
+
+            try:
+                if legacy_path.resolve() == destination.resolve():
+                    continue
+            except Exception:
+                pass
+
+            self.after(0, self._append_log, f'Removendo instalação antiga em: {legacy_path}')
+            uninstall_result = run_uninstall(legacy_path)
+            uninstall_results.append((str(legacy_path), uninstall_result))
+            self.after(
+                0,
+                self._append_log,
+                (
+                    'Instalação antiga removida. '
+                    f"Itens removidos: {uninstall_result.get('removed', 0)}. "
+                    f"Ignorados: {uninstall_result.get('skipped', 0)}."
+                ),
+            )
+
+        return migrated_files, skipped_files, uninstall_results
 
     def _clear_log(self):
         self.log_text.configure(state='normal')
@@ -524,6 +606,7 @@ class Install(ctk.CTk):
             program_name,
             (
                 f'Arquivos {status_text} em:\n{destination}\n\n'
+                f'Dados do usuário em:\n{local_data_path()}\n\n'
                 f'Copiados: {updated_files}\nInalterados: {skipped_files}'
                 f'{shortcuts_text}'
             ),
@@ -562,6 +645,9 @@ class Install(ctk.CTk):
                         f'Usando fallback automático: {destination}'
                     ),
                 )
+
+            self.after(0, self._append_log, f'Dados do usuário serão armazenados em: {local_data_path()}')
+            self._migrate_legacy_installation(destination)
 
             total_files = len(files)
             self.after(0, self._prepare_copy_progress, total_files)

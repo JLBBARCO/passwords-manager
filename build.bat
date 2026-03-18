@@ -4,6 +4,13 @@ echo   Password Manager - Build Script (Simple)
 echo ================================================
 echo.
 
+if not exist ".venv\Scripts\python.exe" (
+echo Criando .venv...
+python -m venv .venv
+)
+
+call ".venv\Scripts\activate.bat"
+
 echo Instalando PyInstaller...
 pip install pyinstaller
 
