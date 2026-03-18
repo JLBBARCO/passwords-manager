@@ -1,0 +1,111 @@
+name: Build Android APK
+
+on:
+    workflow_dispatch:
+    release:
+        types: [published]
+
+permissions:
+    contents: write
+
+jobs:
+    android-readiness:
+        runs-on: ubuntu-latest
+        outputs:
+            ready: ${{ steps.check.outputs.ready }}
+            reason: ${{ steps.check.outputs.reason }}
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Check Android build readiness
+              id: check
+              shell: bash
+              run: |
+                  READY=true
+                  REASON="ready"
+
+                  if [[ ! -f "buildozer.spec" ]]; then
+                    READY=false
+                    REASON="buildozer.spec not found at repository root"
+                  fi
+
+                  if [[ ! -f "android/main.py" ]]; then
+                    READY=false
+                    REASON="android/main.py not found. Add an Android entry point for Kivy."
+                  fi
+
+                  if [[ "${READY}" == "true" ]] && ! grep -qE "^source\.dir[[:space:]]*=[[:space:]]*android$" buildozer.spec; then
+                    READY=false
+                    REASON="buildozer.spec must contain 'source.dir = android' for this repository layout."
+                  fi
+
+                  echo "ready=${READY}" >> "$GITHUB_OUTPUT"
+                  echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
+
+            - name: Publish readiness summary
+              shell: bash
+              run: |
+                  echo "Android readiness: ${{ steps.check.outputs.ready }}" >> "$GITHUB_STEP_SUMMARY"
+                  echo "Reason: ${{ steps.check.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+
+    build-android-apk:
+        needs: android-readiness
+        if: needs.android-readiness.outputs.ready == 'true'
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install Android build dependencies
+              shell: bash
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                    git zip unzip openjdk-17-jdk \
+                    autoconf libtool pkg-config zlib1g-dev \
+                    libncurses5-dev libncursesw5-dev libtinfo6 \
+                    cmake libffi-dev libssl-dev
+
+                  python -m pip install --upgrade pip
+                  pip install buildozer==1.5.0 cython==0.29.36
+
+            - name: Build APK (debug)
+              shell: bash
+              run: |
+                  buildozer android debug
+
+            - name: Upload APK artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: passwords-manager-android-apk
+                  path: bin/*.apk
+
+            - name: Attach APK to Release
+              if: github.event_name == 'release'
+              uses: softprops/action-gh-release@v1
+              with:
+                  tag_name: ${{ github.event.release.tag_name }}
+                  files: bin/*.apk
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    android-not-ready:
+        needs: android-readiness
+        if: needs.android-readiness.outputs.ready != 'true'
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Explain why APK was skipped
+              shell: bash
+              run: |
+                  echo "APK build skipped automatically." >> "$GITHUB_STEP_SUMMARY"
+                  echo "Reason: ${{ needs.android-readiness.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+                  echo "To enable APK generation, keep buildozer.spec at root and android/main.py as mobile entrypoint." >> "$GITHUB_STEP_SUMMARY"
