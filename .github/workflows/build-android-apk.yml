@@ -116,10 +116,10 @@ jobs:
               'orientation = portrait' \
               'fullscreen = 0' \
               'android.permissions = INTERNET' \
-              'android.api = 33' \
+              'android.api = 34' \
               'android.minapi = 24' \
               'android.ndk = 25b' \
-              'android.archs = arm64-v8a,armeabi-v7a' \
+              'android.archs = arm64-v8a,armeabi-v7a,x86_64' \
               '' \
               '[buildozer]' \
               'log_level = 2' \
@@ -135,6 +135,18 @@ jobs:
           fi
           if ! grep -qE "^android\.accept_sdk_license[[:space:]]*=[[:space:]]*True$" "${SPEC_PATH}"; then
             echo "android.accept_sdk_license = True" >> "${SPEC_PATH}"
+          fi
+
+          if grep -qE "^android\.api[[:space:]]*=" "${SPEC_PATH}"; then
+            sed -i -E 's/^android\.api[[:space:]]*=.*/android.api = 34/' "${SPEC_PATH}"
+          else
+            echo "android.api = 34" >> "${SPEC_PATH}"
+          fi
+
+          if grep -qE "^android\.archs[[:space:]]*=" "${SPEC_PATH}"; then
+            sed -i -E 's/^android\.archs[[:space:]]*=.*/android.archs = arm64-v8a,armeabi-v7a,x86_64/' "${SPEC_PATH}"
+          else
+            echo "android.archs = arm64-v8a,armeabi-v7a,x86_64" >> "${SPEC_PATH}"
           fi
 
       - name: Build APK (debug)
