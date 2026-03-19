@@ -60,8 +60,7 @@ jobs:
             PUBLISH_PACKAGES="true"
           elif [[ "${GITHUB_REF}" == refs/tags/beta* ]]; then
             RELEASE_TAG="${GITHUB_REF_NAME}"
-            PUBLISH_PACKAGES="true"
-            WINGET_IDENTIFIER="JLBBARCO.PasswordsManager.Beta"
+            PUBLISH_PACKAGES="false"
             HOMEBREW_FORMULA_FILE="passwords-manager-beta.rb"
             HOMEBREW_FORMULA_CLASS="PasswordsManagerBeta"
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.publish_tag }}" ]]; then
@@ -70,11 +69,10 @@ jobs:
               RELEASE_TAG="v${RELEASE_TAG}"
             fi
             if [[ "${RELEASE_TAG}" == beta* ]]; then
-              WINGET_IDENTIFIER="JLBBARCO.PasswordsManager.Beta"
               HOMEBREW_FORMULA_FILE="passwords-manager-beta.rb"
               HOMEBREW_FORMULA_CLASS="PasswordsManagerBeta"
             fi
-            if [[ "${{ inputs.publish_packages }}" == "true" ]]; then
+            if [[ "${{ inputs.publish_packages }}" == "true" && "${RELEASE_TAG}" == v* ]]; then
               PUBLISH_PACKAGES="true"
             fi
           elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
@@ -121,8 +119,7 @@ jobs:
               RELEASE_TAG="${NEXT_TAG}"
             fi
 
-            PUBLISH_PACKAGES="true"
-            WINGET_IDENTIFIER="JLBBARCO.PasswordsManager.Beta"
+            PUBLISH_PACKAGES="false"
             HOMEBREW_FORMULA_FILE="passwords-manager-beta.rb"
             HOMEBREW_FORMULA_CLASS="PasswordsManagerBeta"
           else
@@ -248,6 +245,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+
+      - name: Cache Android build directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-android-build-v2-${{ hashFiles('buildozer.spec', 'android/buildozer.spec', 'requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-android-build-v2-
 
       - name: Restore Android debug keystore cache
         uses: actions/cache@v4
@@ -436,7 +445,7 @@ jobs:
               'android.api = 34' \
               'android.minapi = 24' \
               'android.ndk = 25b' \
-              'android.archs = arm64-v8a,armeabi-v7a,x86_64' \
+              'android.archs = arm64-v8a' \
               '' \
               '[buildozer]' \
               'log_level = 2' \
@@ -463,9 +472,9 @@ jobs:
           fi
 
           if grep -qE "^android\.archs[[:space:]]*=" "${SPEC_PATH}"; then
-            sed -i -E 's/^android\.archs[[:space:]]*=.*/android.archs = arm64-v8a,armeabi-v7a,x86_64/' "${SPEC_PATH}"
+            sed -i -E 's/^android\.archs[[:space:]]*=.*/android.archs = arm64-v8a/' "${SPEC_PATH}"
           else
-            echo "android.archs = arm64-v8a,armeabi-v7a,x86_64" >> "${SPEC_PATH}"
+            echo "android.archs = arm64-v8a" >> "${SPEC_PATH}"
           fi
 
           NUMERIC_VERSION="${GITHUB_RUN_NUMBER}"
@@ -729,7 +738,7 @@ jobs:
   publish-winget:
     needs: [prepare-release-context, create-release]
     runs-on: ubuntu-latest
-    if: needs.prepare-release-context.outputs.publish_packages == 'true'
+    if: needs.prepare-release-context.outputs.publish_packages == 'true' && startsWith(needs.prepare-release-context.outputs.release_tag, 'v')
     permissions:
       contents: read
 
@@ -813,7 +822,7 @@ jobs:
           identifier: ${{ needs.prepare-release-context.outputs.winget_identifier }}
           installers-regex: '^install-passwords-manager\.exe$'
           release-tag: ${{ needs.prepare-release-context.outputs.release_tag }}
-          release-repository: ${{ github.repository }}
+          release-repository: ${{ github.event.repository.name }}
           fork-user: ${{ github.repository_owner }}
 
       - name: Inform Winget bootstrap requirement
@@ -826,11 +835,11 @@ jobs:
   publish-homebrew:
     needs: [prepare-release-context, create-release]
     runs-on: ubuntu-latest
-    if: needs.prepare-release-context.outputs.publish_packages == 'true'
+    if: needs.prepare-release-context.outputs.publish_packages == 'true' && startsWith(needs.prepare-release-context.outputs.release_tag, 'v')
     permissions:
       contents: read
     env:
-      HOMEBREW_TAP_REPOSITORY: ""
+      HOMEBREW_TAP_REPOSITORY: "JLBBARCO/homebrew-tap"
       HOMEBREW_TAP_TOKEN: ${{ github.token }}
 
     steps:

@@ -36,19 +36,6 @@ jobs:
           elif [[ -f "android/buildozer.spec" ]]; then
             SPEC_PATH="android/buildozer.spec"
             SPEC_DIR="android"
-          REPO_ROOT="$(git rev-parse --show-toplevel)"
-          cd "${REPO_ROOT}"
-
-          echo "Repository root resolved to: ${REPO_ROOT}"
-          echo "Current directory: $(pwd)"
-          ls -la
-
-          READY=true
-          REASON="ready"
-
-          if [[ ! -f "buildozer.spec" ]]; then
-            READY=false
-            REASON="buildozer.spec not found at repository root"
           fi
 
           if [[ ! -f "android/main.py" ]]; then
@@ -62,7 +49,7 @@ jobs:
             REASON="buildozer.spec missing, fallback spec will be generated during build."
           fi
 
-          if [[ "${READY}" == "true" ]] && ! grep -qE "^source\.dir[[:space:]]*=[[:space:]]*(android|\.)$" "${SPEC_PATH}"; then
+          if [[ "${READY}" == "true" ]] && [[ -f "${SPEC_PATH}" ]] && ! grep -qE "^source\.dir[[:space:]]*=[[:space:]]*(android|\.)$" "${SPEC_PATH}"; then
             READY=false
             REASON="buildozer.spec must contain either 'source.dir = android' or 'source.dir = .'."
           fi
@@ -92,6 +79,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+
+      - name: Cache Android build directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-android-build-v2-${{ hashFiles('buildozer.spec', 'android/buildozer.spec', 'requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-android-build-v2-
 
       - name: Restore Android debug keystore cache
         uses: actions/cache@v4
@@ -143,7 +142,7 @@ jobs:
               'android.api = 34' \
               'android.minapi = 24' \
               'android.ndk = 25b' \
-              'android.archs = arm64-v8a,armeabi-v7a,x86_64' \
+              'android.archs = arm64-v8a' \
               '' \
               '[buildozer]' \
               'log_level = 2' \
@@ -168,9 +167,9 @@ jobs:
           fi
 
           if grep -qE "^android\.archs[[:space:]]*=" "${SPEC_PATH}"; then
-            sed -i -E 's/^android\.archs[[:space:]]*=.*/android.archs = arm64-v8a,armeabi-v7a,x86_64/' "${SPEC_PATH}"
+            sed -i -E 's/^android\.archs[[:space:]]*=.*/android.archs = arm64-v8a/' "${SPEC_PATH}"
           else
-            echo "android.archs = arm64-v8a,armeabi-v7a,x86_64" >> "${SPEC_PATH}"
+            echo "android.archs = arm64-v8a" >> "${SPEC_PATH}"
           fi
 
           NUMERIC_VERSION="${GITHUB_RUN_NUMBER}"
