@@ -172,11 +172,22 @@ jobs:
             mkdir -p "$HOME/.android"
             touch "$HOME/.android/repositories.cfg"
 
+            mkdir -p "${SDK_ROOT}/licenses"
+            printf '%s\n' \
+              '24333f8a63b6825ea9c5514f83c2829b004d1fee' \
+              'd56f5187479451eabf01fb78af6dfcb131a6481e' \
+              > "${SDK_ROOT}/licenses/android-sdk-license"
+            printf '%s\n' \
+              '84831b9409646a918e30573bab4c9c91346d8abd' \
+              > "${SDK_ROOT}/licenses/android-sdk-preview-license"
+
             yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" --licenses >/dev/null || true
             yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" --update >/dev/null || true
             yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" \
-              "platform-tools" "platforms;android-33" "build-tools;33.0.2" >/dev/null || true
+              "platform-tools" "platforms;android-33" "build-tools;33.0.2" "build-tools;37.0.0-rc2" >/dev/null || true
           }
+
+          accept_android_licenses
 
           if ! run_build; then
             echo "First Android build attempt failed. Accepting Android SDK licenses and retrying once..."
