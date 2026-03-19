@@ -151,15 +151,31 @@ jobs:
           }
 
           accept_android_licenses() {
-            SDKMANAGER_PATH=$(find "$HOME/.buildozer" -type f -path "*/android-sdk/*/bin/sdkmanager" | head -n 1 || true)
+            SDK_ROOT=$(find "$HOME/.buildozer" -type d -path "*/android-sdk" | head -n 1 || true)
+            if [[ -z "${SDK_ROOT}" ]]; then
+              echo "Android SDK root not found yet under ~/.buildozer; skipping proactive license acceptance."
+              return 0
+            fi
+
+            SDKMANAGER_PATH=""
+            if [[ -x "${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" ]]; then
+              SDKMANAGER_PATH="${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+            elif [[ -x "${SDK_ROOT}/tools/bin/sdkmanager" ]]; then
+              SDKMANAGER_PATH="${SDK_ROOT}/tools/bin/sdkmanager"
+            fi
+
             if [[ -z "${SDKMANAGER_PATH}" ]]; then
               echo "sdkmanager not found yet under ~/.buildozer; skipping proactive license acceptance."
               return 0
             fi
 
-            yes | "${SDKMANAGER_PATH}" --licenses >/dev/null || true
-            yes | "${SDKMANAGER_PATH}" --update >/dev/null || true
-            yes | "${SDKMANAGER_PATH}" "platform-tools" "platforms;android-33" "build-tools;33.0.2" >/dev/null || true
+            mkdir -p "$HOME/.android"
+            touch "$HOME/.android/repositories.cfg"
+
+            yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" --licenses >/dev/null || true
+            yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" --update >/dev/null || true
+            yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" \
+              "platform-tools" "platforms;android-33" "build-tools;33.0.2" >/dev/null || true
           }
 
           if ! run_build; then
