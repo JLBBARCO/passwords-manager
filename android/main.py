@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 
 from kivy.app import App  # type: ignore
+from kivy.metrics import dp  # type: ignore
 from kivy.uix.boxlayout import BoxLayout  # type: ignore
 from kivy.uix.button import Button  # type: ignore
 from kivy.uix.label import Label  # type: ignore
@@ -12,7 +13,7 @@ from storage import AndroidPasswordStore
 
 class PasswordsManagerMobile(BoxLayout):
     def __init__(self, **kwargs):
-        super().__init__(orientation="vertical", spacing=10, padding=14, **kwargs)
+        super().__init__(orientation="vertical", spacing=dp(8), padding=dp(10), **kwargs)
 
         self.store = AndroidPasswordStore()
 
@@ -20,43 +21,48 @@ class PasswordsManagerMobile(BoxLayout):
             text="Passwords Manager (Android)",
             font_size="22sp",
             size_hint=(1, None),
-            height=40,
+            height=dp(40),
         )
         self.add_widget(self.title_label)
 
         self.status_label = Label(
             text="Ready",
             size_hint=(1, None),
-            height=32,
+            height=dp(28),
+            color=(0.15, 0.65, 0.2, 1),
         )
         self.add_widget(self.status_label)
+
+        form_scroll = ScrollView(size_hint=(1, None), height=dp(184), do_scroll_x=False)
+        form_box = BoxLayout(orientation="vertical", spacing=dp(8), size_hint_y=None)
+        form_box.bind(minimum_height=form_box.setter("height"))
 
         self.address_input = TextInput(
             hint_text="Address",
             multiline=False,
             size_hint=(1, None),
-            height=42,
+            height=dp(42),
         )
-        self.add_widget(self.address_input)
+        form_box.add_widget(self.address_input)
 
         self.user_input = TextInput(
             hint_text="User",
             multiline=False,
             size_hint=(1, None),
-            height=42,
+            height=dp(42),
         )
-        self.add_widget(self.user_input)
+        form_box.add_widget(self.user_input)
 
         self.password_input = TextInput(
             hint_text="Password",
             multiline=False,
             password=True,
             size_hint=(1, None),
-            height=42,
+            height=dp(42),
         )
-        self.add_widget(self.password_input)
+        form_box.add_widget(self.password_input)
 
-        buttons = BoxLayout(orientation="horizontal", spacing=8, size_hint=(1, None), height=44)
+        buttons = BoxLayout(orientation="horizontal", spacing=dp(8), size_hint=(1, None), height=dp(44))
         self.save_button = Button(text="Save")
         self.save_button.bind(on_press=self._on_save)
         buttons.add_widget(self.save_button)
@@ -68,18 +74,22 @@ class PasswordsManagerMobile(BoxLayout):
         self.refresh_button = Button(text="Refresh")
         self.refresh_button.bind(on_press=self._refresh_list)
         buttons.add_widget(self.refresh_button)
-        self.add_widget(buttons)
+        form_box.add_widget(buttons)
+
+        form_scroll.add_widget(form_box)
+        self.add_widget(form_scroll)
 
         self.list_title = Label(
             text="Stored passwords",
             size_hint=(1, None),
-            height=30,
+            height=dp(26),
         )
         self.add_widget(self.list_title)
 
         self.scroll = ScrollView(size_hint=(1, 1))
         self.list_label = Label(text="", valign="top", halign="left", size_hint_y=None)
         self.list_label.bind(texture_size=self._update_list_height)
+        self.scroll.bind(width=self._update_list_height)
         self.scroll.add_widget(self.list_label)
         self.add_widget(self.scroll)
 
@@ -87,7 +97,7 @@ class PasswordsManagerMobile(BoxLayout):
 
     def _update_list_height(self, *_args):
         self.list_label.height = max(self.list_label.texture_size[1], 1)
-        self.list_label.text_size = (self.scroll.width - 20, None)
+        self.list_label.text_size = (max(self.scroll.width - dp(20), dp(80)), None)
 
     def _set_status(self, text):
         self.status_label.text = text

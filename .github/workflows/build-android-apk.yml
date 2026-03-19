@@ -80,6 +80,17 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Restore Android debug keystore cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: ${{ runner.os }}-android-debug-keystore-v1
+
+      - name: Ensure Android keystore directory
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+
       - name: Install Android build dependencies
         shell: bash
         run: |
@@ -149,6 +160,13 @@ jobs:
             echo "android.archs = arm64-v8a,armeabi-v7a,x86_64" >> "${SPEC_PATH}"
           fi
 
+          NUMERIC_VERSION="${GITHUB_RUN_NUMBER}"
+          if grep -qE "^android\.numeric_version[[:space:]]*=" "${SPEC_PATH}"; then
+            sed -i -E "s/^android\\.numeric_version[[:space:]]*=.*/android.numeric_version = ${NUMERIC_VERSION}/" "${SPEC_PATH}"
+          else
+            echo "android.numeric_version = ${NUMERIC_VERSION}" >> "${SPEC_PATH}"
+          fi
+
       - name: Build APK (debug)
         shell: bash
         run: |
@@ -216,7 +234,7 @@ jobs:
             yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" --licenses >/dev/null || true
             yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" --update >/dev/null || true
             yes | "${SDKMANAGER_PATH}" --sdk_root="${SDK_ROOT}" \
-              "platform-tools" "platforms;android-33" "build-tools;33.0.2" "build-tools;37.0.0-rc2" >/dev/null || true
+              "platform-tools" "platforms;android-34" "build-tools;33.0.2" "build-tools;37.0.0-rc2" >/dev/null || true
           }
 
           accept_android_licenses
