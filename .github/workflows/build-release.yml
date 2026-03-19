@@ -564,7 +564,14 @@ jobs:
             artifacts/buildozer-debug.log
 
   create-release:
-    needs: [prepare-release-context, build-windows, build-linux, build-macos]
+    needs:
+      [
+        prepare-release-context,
+        build-windows,
+        build-linux,
+        build-macos,
+        build-android-apk,
+      ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
