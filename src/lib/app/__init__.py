@@ -119,20 +119,20 @@ class App(ctk.CTk):
         self.table_content.bind("<Configure>", self._update_table_scrollregion)
         self.table_canvas.bind("<Configure>", self._on_table_canvas_configure)
 
-        # Keep table columns expanding consistently
-        self.table_content.grid_columnconfigure(0, weight=1)
-        self.table_content.grid_columnconfigure(1, weight=1)
-        self.table_content.grid_columnconfigure(2, weight=1)
+        # Keep table columns stable and equally distributed.
+        self.table_content.grid_columnconfigure(0, weight=1, uniform="tablecols", minsize=160)
+        self.table_content.grid_columnconfigure(1, weight=1, uniform="tablecols", minsize=130)
+        self.table_content.grid_columnconfigure(2, weight=1, uniform="tablecols", minsize=180)
 
         # Keep compatibility with existing rendering code
         self.showTable = self.table_content
 
-        self.showTableTitleAddress = ctk.CTkLabel(self.showTable, text='Address')
-        self.showTableTitleAddress.grid(row=0, column=0, padx=padMain, pady=padMain)
-        self.showTableTitleUser = ctk.CTkLabel(self.showTable, text='User')
-        self.showTableTitleUser.grid(row=0, column=1, padx=padMain, pady=padMain)
-        self.showTableTitlePassword = ctk.CTkLabel(self.showTable, text='Password')
-        self.showTableTitlePassword.grid(row=0, column=2, padx=padMain, pady=padMain)
+        self.showTableTitleAddress = ctk.CTkLabel(self.showTable, text='Address', anchor='w')
+        self.showTableTitleAddress.grid(row=0, column=0, padx=padMain, pady=padMain, sticky="w")
+        self.showTableTitleUser = ctk.CTkLabel(self.showTable, text='User', anchor='w')
+        self.showTableTitleUser.grid(row=0, column=1, padx=padMain, pady=padMain, sticky="w")
+        self.showTableTitlePassword = ctk.CTkLabel(self.showTable, text='Password', anchor='w')
+        self.showTableTitlePassword.grid(row=0, column=2, padx=padMain, pady=padMain, sticky="w")
 
         self.loading_label = ctk.CTkLabel(self.showTable, text="Changing Data...")
         self.loading_label.grid(row=1, column=0, columnspan=3, padx=padMain, pady=padMain)
@@ -144,16 +144,13 @@ class App(ctk.CTk):
 
         self.areaGenerate = ctk.CTkFrame(self)
         self.areaGenerate.grid(row=4, column=0, columnspan=3, padx=padMain, pady=padMain, sticky="ew")
-        # Keep action buttons centered while the container adapts
         self.areaGenerate.grid_columnconfigure(0, weight=1)
-        self.areaGenerate.grid_columnconfigure(1, weight=0)
-        self.areaGenerate.grid_columnconfigure(2, weight=1)
         self.buttonGenerateSimplePassword = ctk.CTkButton(
             self.areaGenerate, text='Generate a Simple Password', command=self.simplePassword)
-        self.buttonGenerateSimplePassword.grid(row=0, column=1, padx=padMain, pady=padMain)
+        self.buttonGenerateSimplePassword.grid(row=0, column=0, padx=padMain, pady=(padMain, 5), sticky="ew")
         self.buttonGenerateComplexPassword = ctk.CTkButton(
             self.areaGenerate, text='Generate a Complex Password', command=self.complexPassword)
-        self.buttonGenerateComplexPassword.grid(row=1, column=1, padx=padMain, pady=padMain)
+        self.buttonGenerateComplexPassword.grid(row=1, column=0, padx=padMain, pady=(5, padMain), sticky="ew")
 
         # Non-GUI generation controls removed to avoid overlapping widgets
 
@@ -297,8 +294,8 @@ class App(ctk.CTk):
             self.status_var.set("Error copying value")
 
     def _create_clickable_cell(self, row, column, value):
-        label = ctk.CTkLabel(self.showTable, text=str(value))
-        label.grid(row=row, column=column, padx=padMain, pady=padMain)
+        label = ctk.CTkLabel(self.showTable, text=str(value), anchor='w')
+        label.grid(row=row, column=column, padx=padMain, pady=padMain, sticky="w")
         label.bind("<Button-1>", lambda _event, v=value: self._copy_table_value(v))
         return label
 
@@ -387,15 +384,17 @@ class App(ctk.CTk):
         if self.areaPrintPassword and self.areaPrintPassword.winfo_exists():
             self.areaPrintPassword.destroy()
         self.areaPrintPassword = ctk.CTkFrame(self.areaGenerate)
-        self.areaPrintPassword.grid(row=0, rowspan=2, column=2, padx=padMain, pady=padMain, sticky="w")
+        self.areaPrintPassword.grid(row=2, column=0, padx=padMain, pady=(0, padMain), sticky="ew")
+        self.areaPrintPassword.grid_columnconfigure(0, weight=1)
+        self.areaPrintPassword.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(self.areaPrintPassword, text=password, fg_color='gray30', padx=10, pady=5)\
-            .grid(row=0, column=0, columnspan=2, padx=5, pady=5)
+            .grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
         ctk.CTkButton(self.areaPrintPassword, text='Copy', width=60,
                       command=lambda: self.copy_password(password))\
-            .grid(row=1, column=0, padx=5, pady=5)
+            .grid(row=1, column=0, padx=5, pady=5, sticky="ew")
         ctk.CTkButton(self.areaPrintPassword, text='Save', width=60,
                       command=lambda: self.save_password(password))\
-            .grid(row=1, column=1, padx=5, pady=5)
+            .grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
     def copy_password(self, password):
         from src.lib.copy import Copy
