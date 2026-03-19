@@ -36,6 +36,19 @@ jobs:
           elif [[ -f "android/buildozer.spec" ]]; then
             SPEC_PATH="android/buildozer.spec"
             SPEC_DIR="android"
+          REPO_ROOT="$(git rev-parse --show-toplevel)"
+          cd "${REPO_ROOT}"
+
+          echo "Repository root resolved to: ${REPO_ROOT}"
+          echo "Current directory: $(pwd)"
+          ls -la
+
+          READY=true
+          REASON="ready"
+
+          if [[ ! -f "buildozer.spec" ]]; then
+            READY=false
+            REASON="buildozer.spec not found at repository root"
           fi
 
           if [[ ! -f "android/main.py" ]]; then
