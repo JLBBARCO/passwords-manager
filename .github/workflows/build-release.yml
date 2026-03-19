@@ -813,7 +813,7 @@ jobs:
           identifier: ${{ needs.prepare-release-context.outputs.winget_identifier }}
           installers-regex: '^install-passwords-manager\.exe$'
           release-tag: ${{ needs.prepare-release-context.outputs.release_tag }}
-          release-repository: ${{ github.repository }}
+          release-repository: ${{ github.event.repository.name }}
           fork-user: ${{ github.repository_owner }}
 
       - name: Inform Winget bootstrap requirement
