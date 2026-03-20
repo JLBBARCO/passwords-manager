@@ -682,7 +682,7 @@ jobs:
             printf 'Android APK assets found: %s\n' "${APK_FILES[@]}"
           fi
 
-      - name: Compose release thumbnail and collect screenshots
+      - name: Compose thumbnail.webp from OS screenshots
         shell: bash
         run: |
           python scripts/generate_screenshots.py \
@@ -693,11 +693,11 @@ jobs:
               artifacts/passwords-manager-macos/src/assets/screenshot/macos.webp \
             --output src/assets/img/thumbnail.webp
 
-          mkdir -p artifacts/release-screenshots
-          cp artifacts/passwords-manager-windows/src/assets/screenshot/windows.webp artifacts/release-screenshots/windows.webp
-          cp artifacts/passwords-manager-linux/src/assets/screenshot/linux.webp artifacts/release-screenshots/linux.webp
-          cp artifacts/passwords-manager-macos/src/assets/screenshot/macos.webp artifacts/release-screenshots/macos.webp
-          cp src/assets/img/thumbnail.webp artifacts/release-screenshots/thumbnail.webp
+      - name: Upload generated thumbnail artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: passwords-manager-thumbnail
+          path: src/assets/img/thumbnail.webp
 
       - name: Get version info
         id: version
@@ -722,13 +722,6 @@ jobs:
             - **Linux AppImage**: `passwords-manager-x86_64.AppImage`
             - **macOS**: `passwords-manager-macos.tar.gz`
             - **Android (APK)**: `passwords-manager-*.apk`
-
-            ### Screenshots
-
-            ![Windows UI](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/windows.webp)
-            ![Linux UI](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/linux.webp)
-            ![macOS UI](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/macos.webp)
-            ![All Platforms](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/thumbnail.webp)
 
             ### Features
 
@@ -757,10 +750,6 @@ jobs:
             artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz
             artifacts/passwords-manager-linux/passwords-manager-x86_64.AppImage
             artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz
-            artifacts/release-screenshots/windows.webp
-            artifacts/release-screenshots/linux.webp
-            artifacts/release-screenshots/macos.webp
-            artifacts/release-screenshots/thumbnail.webp
             scripts/install-unix.sh
             scripts/uninstall-unix.sh
             packaging/homebrew/passwords-manager.rb
@@ -867,8 +856,8 @@ jobs:
           echo "Release assets evaluated for Winget:"
           echo "${ASSET_NAMES}"
 
-          if ! echo "${ASSET_NAMES}" | grep -Eq '^install-passwords-manager\.exe$'; then
-            echo "Required Winget installer asset not found: install-passwords-manager.exe" >&2
+          if ! echo "${ASSET_NAMES}" | grep -Eq '^passwords-manager-windows\.zip$'; then
+            echo "Required Winget installer asset not found: passwords-manager-windows.zip" >&2
             exit 1
           fi
 
@@ -878,7 +867,7 @@ jobs:
         with:
           token: ${{ secrets.WINGET_TOKEN }}
           identifier: ${{ needs.prepare-release-context.outputs.winget_identifier }}
-          installers-regex: '^install-passwords-manager\.exe$'
+          installers-regex: '^passwords-manager-windows\.zip$'
           release-tag: ${{ needs.prepare-release-context.outputs.release_tag }}
           release-repository: ${{ github.event.repository.name }}
           fork-user: ${{ github.repository_owner }}
@@ -902,14 +891,19 @@ jobs:
 
     steps:
       - name: Validate Homebrew tap token
+        id: tap_token
         shell: bash
         run: |
           if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
-            echo "HOMEBREW_TAP_TOKEN secret is required to push formula updates to ${HOMEBREW_TAP_REPOSITORY}." >&2
-            exit 1
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "Homebrew publish skipped: HOMEBREW_TAP_TOKEN secret is missing." >> "$GITHUB_STEP_SUMMARY"
+            echo "Add HOMEBREW_TAP_TOKEN with contents:write on ${HOMEBREW_TAP_REPOSITORY}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Resolve version and URLs
+        if: steps.tap_token.outputs.has_token == 'true'
         id: vars
         run: |
           RELEASE_TAG="${{ needs.prepare-release-context.outputs.release_tag }}"
@@ -932,6 +926,7 @@ jobs:
           echo "mac_sha=${MAC_SHA}" >> $GITHUB_OUTPUT
 
       - name: Check access to Homebrew tap repository
+        if: steps.tap_token.outputs.has_token == 'true'
         id: tap_access
         shell: bash
         run: |
@@ -957,7 +952,7 @@ jobs:
           fi
 
       - name: Checkout homebrew tap repository
-        if: steps.tap_access.outputs.accessible == 'true'
+        if: steps.tap_token.outputs.has_token == 'true' && steps.tap_access.outputs.accessible == 'true'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.HOMEBREW_TAP_REPOSITORY }}
@@ -965,7 +960,7 @@ jobs:
           path: homebrew-tap
 
       - name: Update formula
-        if: steps.tap_access.outputs.accessible == 'true'
+        if: steps.tap_token.outputs.has_token == 'true' && steps.tap_access.outputs.accessible == 'true'
         run: |
           FORMULA_FILE="${{ needs.prepare-release-context.outputs.homebrew_formula_file }}"
           FORMULA_CLASS="${{ needs.prepare-release-context.outputs.homebrew_formula_class }}"
@@ -1000,7 +995,7 @@ jobs:
           EOF
 
       - name: Commit and push formula update
-        if: steps.tap_access.outputs.accessible == 'true'
+        if: steps.tap_token.outputs.has_token == 'true' && steps.tap_access.outputs.accessible == 'true'
         run: |
           cd homebrew-tap
           FORMULA_FILE="${{ needs.prepare-release-context.outputs.homebrew_formula_file }}"
@@ -1012,7 +1007,7 @@ jobs:
           git push
 
       - name: Inform Homebrew tap access requirement
-        if: steps.tap_access.outputs.accessible != 'true'
+        if: steps.tap_token.outputs.has_token == 'true' && steps.tap_access.outputs.accessible != 'true'
         shell: bash
         run: |
           if [[ -z "${HOMEBREW_TAP_REPOSITORY}" ]]; then
