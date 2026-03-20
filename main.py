@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.lib.app import App
 from src.lib.install import Install
+from src.lib.shortcuts import ensure_platform_shortcuts_best_effort
 
 
 def _is_running_from_winget_package():
@@ -25,5 +26,9 @@ def _is_running_from_winget_package():
 
 
 if __name__ == '__main__':
-    app = Install() if _is_running_from_winget_package() else App()
+    if _is_running_from_winget_package():
+        app = Install()
+    else:
+        ensure_platform_shortcuts_best_effort()
+        app = App()
     app.mainloop()
