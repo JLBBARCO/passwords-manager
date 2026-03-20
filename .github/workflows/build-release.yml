@@ -162,7 +162,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller pillow
 
       - name: Build executables
         env:
@@ -222,6 +222,10 @@ jobs:
 
           Remove-Item -Path $testShortcutDir -Recurse -Force
 
+      - name: Generate UI screenshot (Windows)
+        run: |
+          python scripts/generate_screenshots.py --os windows --output src/assets/screenshot/windows.webp
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -229,6 +233,7 @@ jobs:
           path: |
             passwords-manager-windows.zip
             installer-package/install-passwords-manager.exe
+            src/assets/screenshot/windows.webp
 
   build-linux:
     needs: [prepare-release-context]
@@ -273,7 +278,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller pillow
           # Install tkinter dependencies for Linux
           sudo apt-get update
           sudo apt-get install -y python3-tk xclip icoutils imagemagick libfuse2 2>/dev/null || true
@@ -335,6 +340,10 @@ jobs:
 
           ARCH=x86_64 ./appimagetool AppDir passwords-manager-x86_64.AppImage
 
+      - name: Generate UI screenshot (Linux)
+        run: |
+          python scripts/generate_screenshots.py --os linux --output src/assets/screenshot/linux.webp
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -342,6 +351,7 @@ jobs:
           path: |
             passwords-manager-linux.tar.gz
             passwords-manager-x86_64.AppImage
+            src/assets/screenshot/linux.webp
 
   build-macos:
     needs: [prepare-release-context]
@@ -363,7 +373,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller pillow
 
       - name: Build executable
         env:
@@ -387,11 +397,17 @@ jobs:
           tar -czf ../passwords-manager-macos.tar.gz *
           cd ..
 
+      - name: Generate UI screenshot (macOS)
+        run: |
+          python scripts/generate_screenshots.py --os macos --output src/assets/screenshot/macos.webp
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: passwords-manager-macos
-          path: passwords-manager-macos.tar.gz
+          path: |
+            passwords-manager-macos.tar.gz
+            src/assets/screenshot/macos.webp
 
   build-android-apk:
     needs: [prepare-release-context]
@@ -620,6 +636,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install image tooling
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pillow
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -631,9 +658,12 @@ jobs:
           REQUIRED_FILES=(
             "artifacts/passwords-manager-windows/passwords-manager-windows.zip"
             "artifacts/passwords-manager-windows/installer-package/install-passwords-manager.exe"
+            "artifacts/passwords-manager-windows/src/assets/screenshot/windows.webp"
             "artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz"
             "artifacts/passwords-manager-linux/passwords-manager-x86_64.AppImage"
+            "artifacts/passwords-manager-linux/src/assets/screenshot/linux.webp"
             "artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz"
+            "artifacts/passwords-manager-macos/src/assets/screenshot/macos.webp"
           )
 
           for file in "${REQUIRED_FILES[@]}"; do
@@ -651,6 +681,23 @@ jobs:
           else
             printf 'Android APK assets found: %s\n' "${APK_FILES[@]}"
           fi
+
+      - name: Compose release thumbnail and collect screenshots
+        shell: bash
+        run: |
+          python scripts/generate_screenshots.py \
+            --compose-thumbnail \
+            --inputs \
+              artifacts/passwords-manager-windows/src/assets/screenshot/windows.webp \
+              artifacts/passwords-manager-linux/src/assets/screenshot/linux.webp \
+              artifacts/passwords-manager-macos/src/assets/screenshot/macos.webp \
+            --output src/assets/img/thumbnail.webp
+
+          mkdir -p artifacts/release-screenshots
+          cp artifacts/passwords-manager-windows/src/assets/screenshot/windows.webp artifacts/release-screenshots/windows.webp
+          cp artifacts/passwords-manager-linux/src/assets/screenshot/linux.webp artifacts/release-screenshots/linux.webp
+          cp artifacts/passwords-manager-macos/src/assets/screenshot/macos.webp artifacts/release-screenshots/macos.webp
+          cp src/assets/img/thumbnail.webp artifacts/release-screenshots/thumbnail.webp
 
       - name: Get version info
         id: version
@@ -675,6 +722,13 @@ jobs:
             - **Linux AppImage**: `passwords-manager-x86_64.AppImage`
             - **macOS**: `passwords-manager-macos.tar.gz`
             - **Android (APK)**: `passwords-manager-*.apk`
+
+            ### Screenshots
+
+            ![Windows UI](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/windows.webp)
+            ![Linux UI](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/linux.webp)
+            ![macOS UI](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/macos.webp)
+            ![All Platforms](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/thumbnail.webp)
 
             ### Features
 
@@ -703,6 +757,10 @@ jobs:
             artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz
             artifacts/passwords-manager-linux/passwords-manager-x86_64.AppImage
             artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz
+            artifacts/release-screenshots/windows.webp
+            artifacts/release-screenshots/linux.webp
+            artifacts/release-screenshots/macos.webp
+            artifacts/release-screenshots/thumbnail.webp
             scripts/install-unix.sh
             scripts/uninstall-unix.sh
             packaging/homebrew/passwords-manager.rb
@@ -840,9 +898,17 @@ jobs:
       contents: read
     env:
       HOMEBREW_TAP_REPOSITORY: "JLBBARCO/homebrew-tap"
-      HOMEBREW_TAP_TOKEN: ${{ github.token }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
     steps:
+      - name: Validate Homebrew tap token
+        shell: bash
+        run: |
+          if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
+            echo "HOMEBREW_TAP_TOKEN secret is required to push formula updates to ${HOMEBREW_TAP_REPOSITORY}." >&2
+            exit 1
+          fi
+
       - name: Resolve version and URLs
         id: vars
         run: |
@@ -954,5 +1020,5 @@ jobs:
             echo "Create a tap repository first, then this workflow will publish formula updates automatically." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Homebrew publish skipped: repository ${HOMEBREW_TAP_REPOSITORY} is not accessible with current token." >> "$GITHUB_STEP_SUMMARY"
-            echo "The default github.token usually cannot write across repositories. Use a PAT with repo permissions if needed." >> "$GITHUB_STEP_SUMMARY"
+            echo "Use HOMEBREW_TAP_TOKEN (PAT or fine-grained token with contents:write on ${HOMEBREW_TAP_REPOSITORY})." >> "$GITHUB_STEP_SUMMARY"
           fi
