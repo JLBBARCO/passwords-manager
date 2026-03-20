@@ -67,6 +67,10 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title('Passwords Manager')
+        self._resize_job = None
+        self._compact_mode = None
+        self._table_col_sizes_default = (160, 130, 180)
+        self._table_col_sizes_compact = (120, 100, 130)
 
         # Make the main window responsive
         self.grid_columnconfigure(0, weight=1)
@@ -120,9 +124,9 @@ class App(ctk.CTk):
         self.table_canvas.bind("<Configure>", self._on_table_canvas_configure)
 
         # Keep table columns stable and equally distributed.
-        self.table_content.grid_columnconfigure(0, weight=1, uniform="tablecols", minsize=160)
-        self.table_content.grid_columnconfigure(1, weight=1, uniform="tablecols", minsize=130)
-        self.table_content.grid_columnconfigure(2, weight=1, uniform="tablecols", minsize=180)
+        self.table_content.grid_columnconfigure(0, weight=1, uniform="tablecols", minsize=self._table_col_sizes_default[0])
+        self.table_content.grid_columnconfigure(1, weight=1, uniform="tablecols", minsize=self._table_col_sizes_default[1])
+        self.table_content.grid_columnconfigure(2, weight=1, uniform="tablecols", minsize=self._table_col_sizes_default[2])
 
         # Keep compatibility with existing rendering code
         self.showTable = self.table_content
@@ -157,8 +161,57 @@ class App(ctk.CTk):
         self.areaPrintPassword = None
 
         self._bind_table_mousewheel_events()
+        self.bind("<Configure>", self._on_window_configure)
+        self.after(0, lambda: self._apply_responsive_layout(self.winfo_width()))
 
         self.check_loading_status()
+
+    def _on_window_configure(self, event):
+        if event.widget is not self:
+            return
+        if self._resize_job is not None:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(80, lambda: self._apply_responsive_layout(event.width))
+
+    def _apply_responsive_layout(self, width):
+        compact = width < 920
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+
+        if compact:
+            current_pad = 6
+            self.SearchButton.configure(width=96)
+            col_sizes = self._table_col_sizes_compact
+            simple_pady = (current_pad, 4)
+            complex_pady = (4, current_pad)
+        else:
+            current_pad = padMain
+            self.SearchButton.configure(width=140)
+            col_sizes = self._table_col_sizes_default
+            simple_pady = (current_pad, 5)
+            complex_pady = (5, current_pad)
+
+        self.textTitle.grid_configure(padx=current_pad, pady=current_pad)
+        self.SearchBar.grid_configure(padx=current_pad, pady=current_pad)
+        self.SearchButton.grid_configure(padx=current_pad, pady=current_pad)
+        self.table_container.grid_configure(padx=current_pad, pady=current_pad)
+        self.buttonRemove.grid_configure(padx=current_pad, pady=current_pad)
+        self.buttonAdd.grid_configure(padx=current_pad, pady=current_pad)
+        self.areaGenerate.grid_configure(padx=current_pad, pady=current_pad)
+
+        self.showTableTitleAddress.grid_configure(padx=current_pad, pady=current_pad)
+        self.showTableTitleUser.grid_configure(padx=current_pad, pady=current_pad)
+        self.showTableTitlePassword.grid_configure(padx=current_pad, pady=current_pad)
+        self.buttonGenerateSimplePassword.grid_configure(padx=current_pad, pady=simple_pady)
+        self.buttonGenerateComplexPassword.grid_configure(padx=current_pad, pady=complex_pady)
+
+        self.table_content.grid_columnconfigure(0, minsize=col_sizes[0])
+        self.table_content.grid_columnconfigure(1, minsize=col_sizes[1])
+        self.table_content.grid_columnconfigure(2, minsize=col_sizes[2])
+
+        if self.areaPrintPassword and self.areaPrintPassword.winfo_exists():
+            self.areaPrintPassword.grid_configure(padx=current_pad, pady=(0, current_pad))
 
     def _parse_version(self, version_text):
         cleaned = (version_text or '').strip().lower().replace('v', '')
