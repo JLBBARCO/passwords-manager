@@ -67,6 +67,7 @@ catch {
 }
 
 $resolvedReleaseTag = Get-DefaultReleaseTag -InputVersion $Version -InputTag $ReleaseTag
+$fixedInstallLocation = 'C:\File Programs (x86)\Passwords Manager'
 
 if (-not $InstallerUrl) {
   $InstallerUrl = "https://github.com/JLBBARCO/passwords-manager/releases/download/$resolvedReleaseTag/install-passwords-manager.exe"
@@ -100,13 +101,17 @@ $installerManifest = @"
 PackageIdentifier: $PackageIdentifier
 PackageVersion: $Version
 InstallerType: exe
-Scope: user
+Scope: machine
 InstallModes:
   - interactive
   - silent
 InstallerSwitches:
   Silent: /S
   SilentWithProgress: /S
+AppsAndFeaturesEntries:
+  - DisplayName: Passwords Manager
+    Publisher: $Publisher
+    InstallLocation: $fixedInstallLocation
 Installers:
   - Architecture: x64
     InstallerUrl: $InstallerUrl

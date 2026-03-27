@@ -27,3 +27,7 @@ After merge, users can install with:
 ```powershell
 winget install JLBBARCO.PasswordsManager
 ```
+
+The generated manifests now target machine scope and set the install location to:
+
+`C:\File Programs (x86)\Passwords Manager`

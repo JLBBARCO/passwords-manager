@@ -1,7 +1,7 @@
 import customtkinter as ctk
-from src.lib.system import select_installation_directory
 from src.lib.uninstall import detect_installation_path, run_uninstall
 import threading
+from pathlib import Path
 from tkinter import messagebox
 
 program_title = 'Uninstall Passwords Manager'
@@ -11,26 +11,13 @@ class Uninstall(ctk.CTk):
         super().__init__()
         self.title(program_title)
         self.uninstalling = False
-        self.installation_path = str(detect_installation_path())
+        self.installation_path = Path(detect_installation_path())
 
         self.label = ctk.CTkLabel(self, text=program_title)
-        self.label.grid(padx=10, pady=5, row=0, columnspan=3)
-
-        self.path_container = ctk.CTkLabel(self, text='')
-        self.path_container.grid(padx=10, pady=10, row=1, columnspan=3)
-
-        self.path_title = ctk.CTkLabel(self.path_container, text='Pasta de instalação:')
-        self.path_title.grid(row=0, column=0, padx=8)
-
-        self.path_label = ctk.CTkLabel(self.path_container, text=self.installation_path, fg_color='gray30')
-        self.path_label.grid(row=0, column=1, padx=8)
-        self.path_label.bind('<Button-1>', self.select_path)
-
-        self.path_button = ctk.CTkButton(self.path_container, text='Escolher pasta', command=self.select_path)
-        self.path_button.grid(row=0, column=2, padx=8)
+        self.label.grid(padx=10, pady=5, row=0, columnspan=2)
 
         self.container_progress = ctk.CTkLabel(self, text='')
-        self.container_progress.grid(padx=20, pady=50, row=2, columnspan=3)
+        self.container_progress.grid(padx=20, pady=50, row=1, columnspan=2)
 
         self.progress_bar = ctk.CTkProgressBar(self.container_progress, width=250)
         self.progress_bar.set(0)
@@ -43,24 +30,13 @@ class Uninstall(ctk.CTk):
         self.status.grid(row=1, column=0, columnspan=3)
 
         self.container_buttons = ctk.CTkLabel(self, text='')
-        self.container_buttons.grid(padx=10, pady=25, row=3, column=1, columnspan=2)
+        self.container_buttons.grid(padx=10, pady=25, row=2, column=0, columnspan=2)
 
         self.uninstall_button = ctk.CTkButton(self.container_buttons, text='Uninstall', command=self.uninstall)
         self.uninstall_button.grid(padx=10, row=0, column=0)
 
         self.cancel_button = ctk.CTkButton(self.container_buttons, text='Cancel', command=self.cancel)
         self.cancel_button.grid(padx=10, row=0, column=1)
-
-    def select_path(self, _event=None):
-        if self.uninstalling:
-            return
-
-        selected_path = select_installation_directory(self.installation_path, self)
-        if not selected_path:
-            return
-
-        self.installation_path = selected_path
-        self.path_label.configure(text=selected_path)
 
     def _update_progress(self, current, total, label):
         percent = int((current / total) * 100) if total > 0 else 100
@@ -71,10 +47,16 @@ class Uninstall(ctk.CTk):
     def _set_controls_state(self, state):
         self.uninstall_button.configure(state=state)
         self.cancel_button.configure(state=state)
-        self.path_button.configure(state=state)
 
     def uninstall(self):
         if self.uninstalling:
+            return
+
+        if not self.installation_path.exists():
+            messagebox.showerror(
+                program_title,
+                f'Instalação não encontrada em:\n{self.installation_path}',
+            )
             return
 
         self.uninstalling = True
