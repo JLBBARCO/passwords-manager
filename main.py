@@ -3,8 +3,10 @@ import sys
 from pathlib import Path
 
 from src.lib.app import App
-from src.lib.install import Install
-from src.lib.shortcuts import ensure_platform_shortcuts_best_effort
+from src.lib.shortcuts import (
+    ensure_platform_shortcuts_best_effort,
+    ensure_windows_start_menu_shortcut_best_effort,
+)
 
 
 def _is_running_from_winget_package():
@@ -27,7 +29,10 @@ def _is_running_from_winget_package():
 
 if __name__ == '__main__':
     if _is_running_from_winget_package():
-        app = Install()
+        # Winget installs can run in user package paths without installer execution.
+        # Ensure Start Menu entry exists for discoverability.
+        ensure_windows_start_menu_shortcut_best_effort()
+        app = App()
     else:
         ensure_platform_shortcuts_best_effort()
         app = App()

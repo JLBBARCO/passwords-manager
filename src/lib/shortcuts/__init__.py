@@ -74,6 +74,42 @@ def _ensure_windows_shortcuts(main_executable):
     return created
 
 
+def ensure_windows_start_menu_shortcut(main_executable=None):
+    if os.name != 'nt':
+        return []
+
+    runtime_executable = main_executable or _runtime_executable()
+    if runtime_executable is None:
+        return []
+
+    created = []
+    failures = []
+
+    for start_menu_dir in windows_start_menu_directories():
+        try:
+            start_menu_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as directory_error:
+            failures.append(f'{start_menu_dir}: {directory_error}')
+            continue
+
+        shortcut_path = start_menu_dir / 'Passwords Manager.lnk'
+        try:
+            create_windows_shortcut(
+                shortcut_path,
+                runtime_executable,
+                runtime_executable.parent,
+                'Passwords Manager',
+            )
+            created.append(str(shortcut_path))
+        except Exception as shortcut_error:
+            failures.append(f'{shortcut_path}: {shortcut_error}')
+
+    if not created and failures:
+        raise RuntimeError('Falha ao criar atalho no Menu Iniciar: ' + '; '.join(failures[:3]))
+
+    return created
+
+
 def _ensure_linux_shortcuts(main_executable):
     app_dir = Path.home() / '.local' / 'share' / 'applications'
     app_dir.mkdir(parents=True, exist_ok=True)
@@ -159,5 +195,12 @@ def ensure_platform_shortcuts():
 def ensure_platform_shortcuts_best_effort():
     try:
         return ensure_platform_shortcuts()
+    except Exception:
+        return []
+
+
+def ensure_windows_start_menu_shortcut_best_effort(main_executable=None):
+    try:
+        return ensure_windows_start_menu_shortcut(main_executable)
     except Exception:
         return []

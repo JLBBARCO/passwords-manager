@@ -106,7 +106,7 @@ Or use just the validator:
 
 ### Windows
 
-- **Winget**: Installer GUI creates shortcuts
+- **Winget**: App creates/updates Start Menu shortcut on startup
 - **Portable**: App creates shortcuts on first run at startup
 - **Pre-compiled**: Shortcuts created at first run
 
@@ -163,7 +163,7 @@ The shortcut creation logic:
 2. **Platform detection**: Uses `os.name`, `sys.platform` to determine OS
 3. **Safe execution**: `ensure_platform_shortcuts_best_effort()` catches all exceptions
 4. **Called at app startup**: In `main.py` before app GUI launches
-5. **Skip on installer**: Installer mode (`_is_running_from_winget_package()`) skips this
+5. **Winget startup path**: `_is_running_from_winget_package()` ensures Start Menu shortcut and opens app directly
 
 ## API Reference
 

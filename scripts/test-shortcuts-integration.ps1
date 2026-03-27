@@ -31,17 +31,17 @@ $StartMenuExists = Test-Path $StartMenuShortcut
 $DesktopExists = Test-Path $DesktopShortcut
 
 if ($StartMenuExists) {
-    Write-Host "→ Start Menu shortcut exists (will check if updated)"
+    Write-Host "-> Start Menu shortcut exists (will check if updated)"
 }
 else {
-    Write-Host "→ Start Menu shortcut does not exist yet"
+    Write-Host "-> Start Menu shortcut does not exist yet"
 }
 
 if ($DesktopExists) {
-    Write-Host "→ Desktop shortcut exists (will check if updated)"
+    Write-Host "-> Desktop shortcut exists (will check if updated)"
 }
 else {
-    Write-Host "→ Desktop shortcut does not exist yet"
+    Write-Host "-> Desktop shortcut does not exist yet"
 }
 
 Write-Host ""
@@ -66,18 +66,18 @@ Write-Host ""
 $TestPassed = $true
 
 if (Test-Path $StartMenuShortcut) {
-    Write-Host "✓ Start Menu shortcut created: $StartMenuShortcut" -ForegroundColor Green
+    Write-Host "[OK] Start Menu shortcut created: $StartMenuShortcut" -ForegroundColor Green
 }
 else {
-    Write-Host "✗ Start Menu shortcut not found: $StartMenuShortcut" -ForegroundColor Red
+    Write-Host "[FAIL] Start Menu shortcut not found: $StartMenuShortcut" -ForegroundColor Red
     $TestPassed = $false
 }
 
 if (Test-Path $DesktopShortcut) {
-    Write-Host "✓ Desktop shortcut created: $DesktopShortcut" -ForegroundColor Green
+    Write-Host "[OK] Desktop shortcut created: $DesktopShortcut" -ForegroundColor Green
 }
 else {
-    Write-Host "✗ Desktop shortcut not found: $DesktopShortcut" -ForegroundColor Red
+    Write-Host "[FAIL] Desktop shortcut not found: $DesktopShortcut" -ForegroundColor Red
     $TestPassed = $false
 }
 
@@ -85,7 +85,7 @@ Write-Host ""
 
 if ($TestPassed) {
     Write-Host "==========================================" -ForegroundColor Cyan
-    Write-Host "✓ Integration test passed!" -ForegroundColor Green
+    Write-Host "[OK] Integration test passed!" -ForegroundColor Green
     Write-Host "==========================================" -ForegroundColor Cyan
     
     if ($Cleanup) {
@@ -93,13 +93,13 @@ if ($TestPassed) {
         Write-Host "Cleaning up test shortcuts..." -ForegroundColor Yellow
         Remove-Item $StartMenuShortcut -Force -ErrorAction SilentlyContinue | Out-Null
         Remove-Item $DesktopShortcut -Force -ErrorAction SilentlyContinue | Out-Null
-        Write-Host "✓ Cleanup complete" -ForegroundColor Green
+        Write-Host "[OK] Cleanup complete" -ForegroundColor Green
     }
     exit 0
 }
 else {
     Write-Host "==========================================" -ForegroundColor Cyan
-    Write-Host "✗ Integration test failed!" -ForegroundColor Red
+    Write-Host "[FAIL] Integration test failed!" -ForegroundColor Red
     Write-Host "==========================================" -ForegroundColor Cyan
     exit 1
 }

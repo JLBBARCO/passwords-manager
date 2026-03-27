@@ -15,16 +15,23 @@ from src.lib.windows_shortcuts import (
 )
 from pathlib import Path
 import hashlib
+import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
+import urllib.request
+import zipfile
+import winreg
 from datetime import datetime
 from tkinter import filedialog, messagebox
 
 program_name = 'Install Passwords Manager'
 installation_path = system_path()
+GITHUB_RELEASES_LATEST_API = 'https://api.github.com/repos/JLBBARCO/passwords-manager/releases/latest'
+WINDOWS_RELEASE_ARCHIVE_NAME = 'passwords-manager-windows.zip'
 
 
 class Install(ctk.CTk):
@@ -55,6 +62,10 @@ class Install(ctk.CTk):
 
 		self.url_select_button = ctk.CTkButton(self.container_url, text='Escolher pasta', command=self.url_select)
 		self.url_select_button.grid(padx=10, row=0, column=2)
+
+		if os.name == 'nt':
+			self.url_title.configure(text='Caminho de instalacao (fixo): ')
+			self.url_select_button.configure(state='disabled')
 
 		self.container_progress = ctk.CTkLabel(self, text='')
 		self.container_progress.grid(padx=25, pady=25, row=2, columnspan=2)
@@ -132,6 +143,9 @@ class Install(ctk.CTk):
 		return self._workspace_root()
 
 	def _resolve_destination(self):
+		if os.name == 'nt':
+			return Path(system_path())
+
 		selected_path = Path(self.installation_path).expanduser()
 
 		if selected_path.name.lower() != 'passwords manager':
@@ -271,30 +285,74 @@ class Install(ctk.CTk):
 
 	def _run_build_script(self):
 		workspace = self._workspace_root()
-		script_path = workspace / 'build-local.ps1'
+		main_py = workspace / 'main.py'
+		uninstall_py = workspace / 'uninstall.py'
+		icon_path = workspace / 'src' / 'assets' / 'icon' / 'passwords-manager.ico'
 
-		if not script_path.exists():
-			raise FileNotFoundError(f'Script de build nao encontrado: {script_path}')
+		if not main_py.exists() or not uninstall_py.exists():
+			raise FileNotFoundError('Arquivos fonte de build nao encontrados para fallback local.')
 
-		process = subprocess.Popen(
-			['powershell', '-ExecutionPolicy', 'Bypass', '-File', str(script_path)],
-			cwd=str(workspace),
-			stdout=subprocess.PIPE,
-			stderr=subprocess.STDOUT,
-			text=True,
-			errors='replace',
-		)
+		for folder_name in ('build', 'dist', 'release'):
+			shutil.rmtree(workspace / folder_name, ignore_errors=True)
 
-		if process.stdout is not None:
-			for output_line in process.stdout:
-				line = output_line.rstrip()
-				if line:
-					self.after(0, self._append_log, line)
+		commands = [
+			[
+				sys.executable,
+				'-m',
+				'PyInstaller',
+				'--onefile',
+				'--noconsole',
+				'--icon',
+				str(icon_path),
+				'--name',
+				'passwords-manager',
+				str(main_py),
+			],
+			[
+				sys.executable,
+				'-m',
+				'PyInstaller',
+				'--onefile',
+				'--noconsole',
+				'--icon',
+				str(icon_path),
+				'--name',
+				'uninstall',
+				str(uninstall_py),
+			],
+		]
 
-		return_code = process.wait()
+		for command in commands:
+			process = subprocess.Popen(
+				command,
+				cwd=str(workspace),
+				stdout=subprocess.PIPE,
+				stderr=subprocess.STDOUT,
+				text=True,
+				errors='replace',
+			)
 
-		if return_code != 0:
-			raise RuntimeError('Falha na compilacao. Verifique os logs para mais detalhes.')
+			if process.stdout is not None:
+				for output_line in process.stdout:
+					line = output_line.rstrip()
+					if line:
+						self.after(0, self._append_log, line)
+
+			if process.wait() != 0:
+				raise RuntimeError('Falha na compilacao local de fallback com PyInstaller.')
+
+		release_dir = workspace / 'release'
+		uninstall_dir = release_dir / 'uninstall'
+		release_dir.mkdir(parents=True, exist_ok=True)
+		uninstall_dir.mkdir(parents=True, exist_ok=True)
+
+		main_exe = workspace / 'dist' / 'passwords-manager.exe'
+		uninstall_exe = workspace / 'dist' / 'uninstall.exe'
+		if not main_exe.exists() or not uninstall_exe.exists():
+			raise FileNotFoundError('Executaveis de fallback nao foram gerados corretamente.')
+
+		shutil.copy2(main_exe, release_dir / 'passwords-manager.exe')
+		shutil.copy2(uninstall_exe, uninstall_dir / 'uninstall.exe')
 
 	def _release_candidates(self):
 		candidates = [self._runtime_root() / 'release']
@@ -328,6 +386,12 @@ class Install(ctk.CTk):
 			)
 
 	def _release_files(self):
+		temp_release = self._download_latest_windows_release_payload()
+		if temp_release is not None:
+			files = [file_path for file_path in temp_release.rglob('*') if file_path.is_file()]
+			self._validate_release_structure(temp_release)
+			return temp_release, files
+
 		checked_paths = []
 		for release_dir in self._release_candidates():
 			checked_paths.append(str(release_dir))
@@ -345,6 +409,62 @@ class Install(ctk.CTk):
 			'Pasta de release nao encontrada ou incompleta. Caminhos verificados: '
 			+ '; '.join(checked_paths)
 		)
+
+	def _download_latest_windows_release_payload(self):
+		if os.name != 'nt':
+			return None
+
+		self.after(0, self._append_log, 'Buscando release mais recente no GitHub...')
+		request = urllib.request.Request(
+			GITHUB_RELEASES_LATEST_API,
+			headers={
+				'User-Agent': 'passwords-manager-installer',
+				'Accept': 'application/vnd.github+json',
+			},
+		)
+
+		try:
+			with urllib.request.urlopen(request, timeout=30) as response:
+				release_data = json.loads(response.read().decode('utf-8'))
+		except Exception as error:
+			self.after(0, self._append_log, f'Aviso: nao foi possivel consultar release mais recente ({error}).')
+			return None
+
+		archive_url = None
+		for asset in release_data.get('assets', []):
+			if asset.get('name') == WINDOWS_RELEASE_ARCHIVE_NAME:
+				archive_url = asset.get('browser_download_url')
+				break
+
+		if not archive_url:
+			self.after(
+				0,
+				self._append_log,
+				'Aviso: asset de payload Windows nao encontrado na release mais recente. Usando payload local.',
+			)
+			return None
+
+		temp_root = Path(tempfile.mkdtemp(prefix='passwords-manager-latest-'))
+		archive_path = temp_root / WINDOWS_RELEASE_ARCHIVE_NAME
+
+		try:
+			self.after(0, self._append_log, f'Baixando payload mais recente: {archive_url}')
+			urllib.request.urlretrieve(archive_url, archive_path)
+			with zipfile.ZipFile(archive_path, 'r') as archive_file:
+				archive_file.extractall(temp_root)
+		except Exception as error:
+			shutil.rmtree(temp_root, ignore_errors=True)
+			self.after(0, self._append_log, f'Aviso: falha ao baixar payload mais recente ({error}).')
+			return None
+
+		release_dir = temp_root / 'release'
+		if not release_dir.exists():
+			shutil.rmtree(temp_root, ignore_errors=True)
+			self.after(0, self._append_log, 'Aviso: payload remoto invalido (pasta release ausente).')
+			return None
+
+		self.after(0, self._append_log, f'Payload mais recente pronto: {release_dir}')
+		return release_dir
 
 	def _create_start_menu_shortcuts(self, destination):
 		if os.name != 'nt':
@@ -437,43 +557,25 @@ class Install(ctk.CTk):
 			raise FileNotFoundError(f'Desinstalador nao encontrado para registro: {uninstall_exe}')
 
 		uninstall_string = f'"{uninstall_exe}"'
-		app_name = 'Passwords Manager'
-		publisher = 'JLBBARCO'
 		install_date = datetime.now().strftime('%Y%m%d')
-		install_location_ps = str(destination_path).replace("'", "''")
-		display_icon_ps = str(display_icon).replace("'", "''")
-		uninstall_string_ps = uninstall_string.replace("'", "''")
+		subkey = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\PasswordsManager'
 
-		reg_path = r'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PasswordsManager'
+		try:
+			key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, subkey, 0, winreg.KEY_SET_VALUE)
+			with key:
+				winreg.SetValueEx(key, 'DisplayName', 0, winreg.REG_SZ, 'Passwords Manager')
+				winreg.SetValueEx(key, 'Publisher', 0, winreg.REG_SZ, 'JLBBARCO')
+				winreg.SetValueEx(key, 'InstallLocation', 0, winreg.REG_SZ, str(destination_path))
+				winreg.SetValueEx(key, 'DisplayIcon', 0, winreg.REG_SZ, str(display_icon))
+				winreg.SetValueEx(key, 'UninstallString', 0, winreg.REG_SZ, uninstall_string)
+				winreg.SetValueEx(key, 'QuietUninstallString', 0, winreg.REG_SZ, uninstall_string)
+				winreg.SetValueEx(key, 'NoModify', 0, winreg.REG_DWORD, 1)
+				winreg.SetValueEx(key, 'NoRepair', 0, winreg.REG_DWORD, 1)
+				winreg.SetValueEx(key, 'InstallDate', 0, winreg.REG_SZ, install_date)
+		except OSError as error:
+			raise RuntimeError(f'Falha ao registrar desinstalacao no Windows: {error}') from error
 
-		script = (
-			f"$path = '{reg_path}';"
-			"if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null };"
-			f"Set-ItemProperty -Path $path -Name 'DisplayName' -Value '{app_name}';"
-			f"Set-ItemProperty -Path $path -Name 'Publisher' -Value '{publisher}';"
-			f"Set-ItemProperty -Path $path -Name 'InstallLocation' -Value '{install_location_ps}';"
-			f"Set-ItemProperty -Path $path -Name 'DisplayIcon' -Value '{display_icon_ps}';"
-			f"Set-ItemProperty -Path $path -Name 'UninstallString' -Value '{uninstall_string_ps}';"
-			f"Set-ItemProperty -Path $path -Name 'QuietUninstallString' -Value '{uninstall_string_ps}';"
-			"Set-ItemProperty -Path $path -Name 'NoModify' -Type DWord -Value 1;"
-			"Set-ItemProperty -Path $path -Name 'NoRepair' -Type DWord -Value 1;"
-			f"Set-ItemProperty -Path $path -Name 'InstallDate' -Value '{install_date}';"
-		)
-
-		result = subprocess.run(
-			['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
-			capture_output=True,
-			text=True,
-			check=False,
-		)
-
-		if result.returncode != 0:
-			raise RuntimeError(
-				'Falha ao registrar desinstalacao no Windows: '
-				+ (result.stderr.strip() or result.stdout.strip() or 'erro desconhecido')
-			)
-
-		return reg_path
+		return f'HKCU\\{subkey}'
 
 	def _linux_shortcut_dir(self):
 		return Path.home() / '.local' / 'share' / 'applications'

@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import subprocess
+import tempfile
 
 
 def _dedupe_paths(paths):
@@ -45,27 +46,43 @@ def windows_desktop_directories():
 
 
 def create_windows_shortcut(shortcut_path, target_exe, working_dir, description):
-    shortcut_path_ps = str(shortcut_path).replace("'", "''")
-    target_exe_ps = str(target_exe).replace("'", "''")
-    working_dir_ps = str(working_dir).replace("'", "''")
-    description_ps = str(description).replace("'", "''")
+    def _escape_vbs(value):
+        return str(value).replace('"', '""')
 
-    script = (
-        "$shell = New-Object -ComObject WScript.Shell;"
-        f"$shortcut = $shell.CreateShortcut('{shortcut_path_ps}');"
-        f"$shortcut.TargetPath = '{target_exe_ps}';"
-        f"$shortcut.WorkingDirectory = '{working_dir_ps}';"
-        f"$shortcut.IconLocation = '{target_exe_ps},0';"
-        f"$shortcut.Description = '{description_ps}';"
-        "$shortcut.Save();"
+    shortcut_path_str = _escape_vbs(shortcut_path)
+    target_exe_str = _escape_vbs(target_exe)
+    working_dir_str = _escape_vbs(working_dir)
+    description_str = _escape_vbs(description)
+
+    vbs_script = (
+        'Set shell = CreateObject("WScript.Shell")\n'
+        f'Set shortcut = shell.CreateShortcut("{shortcut_path_str}")\n'
+        f'shortcut.TargetPath = "{target_exe_str}"\n'
+        f'shortcut.WorkingDirectory = "{working_dir_str}"\n'
+        f'shortcut.IconLocation = "{target_exe_str},0"\n'
+        f'shortcut.Description = "{description_str}"\n'
+        'shortcut.Save\n'
     )
 
-    result = subprocess.run(
-        ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    script_file = None
+    script_path = None
+    try:
+        script_file = tempfile.NamedTemporaryFile('w', suffix='.vbs', delete=False, encoding='utf-8')
+        script_file.write(vbs_script)
+        script_file.close()
+        script_path = Path(script_file.name)
+
+        result = subprocess.run(
+            ['cscript.exe', '//NoLogo', str(script_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        if script_file is not None and not script_file.closed:
+            script_file.close()
+        if script_path is not None:
+            script_path.unlink(missing_ok=True)
 
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip() or 'erro desconhecido')

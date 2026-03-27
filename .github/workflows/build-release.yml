@@ -162,80 +162,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller pillow
+          pip install pyinstaller
 
       - name: Build executables
         env:
           PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.build_version }}
         run: |
-          python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=passwords-manager main.py
-          python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=uninstall uninstall.py
           python -m PyInstaller --onefile --noconsole --icon=src/assets/icon/passwords-manager.ico --name=install-passwords-manager install.py
-
-      - name: Prepare release files
-        run: |
-          mkdir release
-          mkdir release\uninstall
-          mkdir installer-package
-          copy dist\passwords-manager.exe release\
-          copy dist\uninstall.exe release\uninstall\uninstall.exe
-          echo ${{ needs.prepare-release-context.outputs.build_version }} > release\VERSION
-          copy README.md release\
-          copy LICENSE release\
-          copy ENCRYPTION.md release\ 2>nul || copy CRIPTOGRAFIA.md release\ENCRYPTION.md
-          copy dist\install-passwords-manager.exe installer-package\
-          xcopy release installer-package\release\ /E /I /Y
-
-      - name: Create ZIP archive
-        run: |
-          Compress-Archive -Path installer-package\* -DestinationPath passwords-manager-windows.zip
-
-      - name: Validate Windows payload and shortcut generation
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          $releaseRoot = Join-Path $PWD 'installer-package\release'
-          $mainExe = Join-Path $releaseRoot 'passwords-manager.exe'
-          $uninstallExe = Join-Path $releaseRoot 'uninstall\uninstall.exe'
-          $installerExe = Join-Path $PWD 'installer-package\install-passwords-manager.exe'
-
-          if (!(Test-Path $mainExe)) { throw "Missing payload file: $mainExe" }
-          if (!(Test-Path $uninstallExe)) { throw "Missing payload file: $uninstallExe" }
-          if (!(Test-Path $installerExe)) { throw "Missing installer file: $installerExe" }
-
-          $testShortcutDir = Join-Path $env:RUNNER_TEMP 'passwords-manager-shortcut-validation'
-          New-Item -ItemType Directory -Path $testShortcutDir -Force | Out-Null
-
-          $shortcutPath = Join-Path $testShortcutDir 'Passwords Manager.lnk'
-          $shell = New-Object -ComObject WScript.Shell
-          $shortcut = $shell.CreateShortcut($shortcutPath)
-          $shortcut.TargetPath = $mainExe
-          $shortcut.WorkingDirectory = $releaseRoot
-          $shortcut.IconLocation = "$mainExe,0"
-          $shortcut.Description = 'Passwords Manager'
-          $shortcut.Save()
-
-          if (!(Test-Path $shortcutPath)) {
-            throw "Shortcut was not created during validation: $shortcutPath"
-          }
-
-          Remove-Item -Path $testShortcutDir -Recurse -Force
-
-      - name: Generate UI screenshot (Windows)
-        run: |
-          python scripts/generate_screenshots.py --os windows --output src/assets/screenshot/windows.webp
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: passwords-manager-windows
           path: |
-            passwords-manager-windows.zip
-            installer-package/install-passwords-manager.exe
-            src/assets/screenshot/windows.webp
+            dist/install-passwords-manager.exe
 
   build-linux:
+    if: false
     needs: [prepare-release-context]
     runs-on: ubuntu-latest
     permissions:
@@ -354,6 +297,7 @@ jobs:
             src/assets/screenshot/linux.webp
 
   build-macos:
+    if: false
     needs: [prepare-release-context]
     runs-on: macos-latest
     permissions:
@@ -410,6 +354,7 @@ jobs:
             src/assets/screenshot/macos.webp
 
   build-android-apk:
+    if: false
     needs: [prepare-release-context]
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -623,9 +568,6 @@ jobs:
       [
         prepare-release-context,
         build-windows,
-        build-linux,
-        build-macos,
-        build-android-apk,
       ]
     runs-on: ubuntu-latest
     permissions:
@@ -641,12 +583,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install image tooling
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          pip install pillow
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -656,14 +592,7 @@ jobs:
         shell: bash
         run: |
           REQUIRED_FILES=(
-            "artifacts/passwords-manager-windows/passwords-manager-windows.zip"
-            "artifacts/passwords-manager-windows/installer-package/install-passwords-manager.exe"
-            "artifacts/passwords-manager-windows/src/assets/screenshot/windows.webp"
-            "artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz"
-            "artifacts/passwords-manager-linux/passwords-manager-x86_64.AppImage"
-            "artifacts/passwords-manager-linux/src/assets/screenshot/linux.webp"
-            "artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz"
-            "artifacts/passwords-manager-macos/src/assets/screenshot/macos.webp"
+            "artifacts/passwords-manager-windows/install-passwords-manager.exe"
           )
 
           for file in "${REQUIRED_FILES[@]}"; do
@@ -672,32 +601,6 @@ jobs:
               exit 1
             fi
           done
-
-          shopt -s nullglob
-          APK_FILES=(artifacts/passwords-manager-android-apk/*.apk)
-          if [[ ${#APK_FILES[@]} -eq 0 ]]; then
-            echo "Android APK not found. Release will be created without APK."
-            echo "Android APK not found. Release was created with desktop artifacts only." >> "$GITHUB_STEP_SUMMARY"
-          else
-            printf 'Android APK assets found: %s\n' "${APK_FILES[@]}"
-          fi
-
-      - name: Compose thumbnail.webp from OS screenshots
-        shell: bash
-        run: |
-          python scripts/generate_screenshots.py \
-            --compose-thumbnail \
-            --inputs \
-              artifacts/passwords-manager-windows/src/assets/screenshot/windows.webp \
-              artifacts/passwords-manager-linux/src/assets/screenshot/linux.webp \
-              artifacts/passwords-manager-macos/src/assets/screenshot/macos.webp \
-            --output src/assets/img/thumbnail.webp
-
-      - name: Upload generated thumbnail artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: passwords-manager-thumbnail
-          path: src/assets/img/thumbnail.webp
 
       - name: Get version info
         id: version
@@ -717,11 +620,7 @@ jobs:
 
             ### Download
 
-            - **Windows**: `passwords-manager-windows.zip`
-            - **Linux**: `passwords-manager-linux.tar.gz`
-            - **Linux AppImage**: `passwords-manager-x86_64.AppImage`
-            - **macOS**: `passwords-manager-macos.tar.gz`
-            - **Android (APK)**: `passwords-manager-*.apk`
+            - **Windows Installer**: `install-passwords-manager.exe`
 
             ### Features
 
@@ -745,40 +644,9 @@ jobs:
             **Build Date:** ${{ github.event.head_commit.timestamp || 'n/a' }}
             **Branch:** ${{ github.ref_name }}
           files: |
-            artifacts/passwords-manager-windows/passwords-manager-windows.zip
-            artifacts/passwords-manager-windows/installer-package/install-passwords-manager.exe
-            artifacts/passwords-manager-linux/passwords-manager-linux.tar.gz
-            artifacts/passwords-manager-linux/passwords-manager-x86_64.AppImage
-            artifacts/passwords-manager-macos/passwords-manager-macos.tar.gz
-            scripts/install-unix.sh
-            scripts/uninstall-unix.sh
-            packaging/homebrew/passwords-manager.rb
+            artifacts/passwords-manager-windows/install-passwords-manager.exe
           draft: false
           prerelease: ${{ startsWith(steps.version.outputs.version, 'beta') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check Android APK artifact presence
-        id: android_apk
-        shell: bash
-        run: |
-          shopt -s nullglob
-          APK_FILES=(artifacts/passwords-manager-android-apk/*.apk)
-          if [[ ${#APK_FILES[@]} -gt 0 ]]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            printf 'Android APK files to attach: %s\n' "${APK_FILES[@]}"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No Android APK files available to attach in this run."
-          fi
-
-      - name: Attach Android APK to existing release
-        if: steps.android_apk.outputs.found == 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          files: |
-            artifacts/passwords-manager-android-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -856,8 +724,8 @@ jobs:
           echo "Release assets evaluated for Winget:"
           echo "${ASSET_NAMES}"
 
-          if ! echo "${ASSET_NAMES}" | grep -Eq '^passwords-manager-windows\.zip$'; then
-            echo "Required Winget installer asset not found: passwords-manager-windows.zip" >&2
+          if ! echo "${ASSET_NAMES}" | grep -Eq '^install-passwords-manager\.exe$'; then
+            echo "Required Winget installer asset not found: install-passwords-manager.exe" >&2
             exit 1
           fi
 
@@ -867,7 +735,7 @@ jobs:
         with:
           token: ${{ secrets.WINGET_TOKEN }}
           identifier: ${{ needs.prepare-release-context.outputs.winget_identifier }}
-          installers-regex: '^passwords-manager-windows\.zip$'
+          installers-regex: '^install-passwords-manager\.exe$'
           release-tag: ${{ needs.prepare-release-context.outputs.release_tag }}
           release-repository: ${{ github.event.repository.name }}
           fork-user: ${{ github.repository_owner }}
@@ -880,14 +748,14 @@ jobs:
           echo "Create the first package version manually, then this workflow will publish updates automatically." >> "$GITHUB_STEP_SUMMARY"
 
   publish-homebrew:
+    if: false
     needs: [prepare-release-context, create-release]
     runs-on: ubuntu-latest
-    if: needs.prepare-release-context.outputs.publish_packages == 'true' && startsWith(needs.prepare-release-context.outputs.release_tag, 'v')
     permissions:
       contents: read
     env:
       HOMEBREW_TAP_REPOSITORY: "JLBBARCO/homebrew-tap"
-      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      HOMEBREW_TAP_TOKEN: ""
 
     steps:
       - name: Validate Homebrew tap token
