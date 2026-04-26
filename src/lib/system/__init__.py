@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 APP_FOLDER_NAME = "Passwords Manager"
-WINDOWS_INSTALL_ROOT = Path("C:/File Programs")
+WINDOWS_INSTALL_ROOT = Path("C:/File Programs (x86)")
+LEGACY_WINDOWS_INSTALL_ROOT = Path("C:/File Programs")
 DATA_FILENAMES = (
     "passwords.json",
     "encryption.key",
@@ -128,7 +129,10 @@ def compatibility_data_paths():
 
 
 def compatibility_installation_paths():
-    return _unique_paths([Path(path()), legacy_local_data_path()])
+    paths = [Path(path()), legacy_local_data_path()]
+    if nameSO() == "Windows":
+        paths.append(LEGACY_WINDOWS_INSTALL_ROOT / APP_FOLDER_NAME)
+    return _unique_paths(paths)
 
 
 def ensure_local_data_dir():

@@ -51,7 +51,7 @@ python migrate_to_encrypted.py
 
 ### Data and Installation Compatibility
 
-- On Windows, the program is installed in `C:\File Programs\Passwords Manager`
+- On Windows, the program is installed in `C:\File Programs (x86)\Passwords Manager`
 - User data is stored in `C:\Users\<user>\AppData\Roaming\Passwords Manager`
 - Compatibility with older versions is maintained by checking previous data/install locations in `AppData\Local`
 - During installation, if a previous version is found in `AppData\Local\Passwords Manager`, the installer migrates `passwords.json` and the encryption key to `AppData\Roaming`, then removes the legacy installation before copying the new version
@@ -82,7 +82,7 @@ python main.py
 
 ### 3. Windows Installation Notes
 
-- Installing into `C:\File Programs\Passwords Manager` can require elevated permissions
+- Installing into `C:\File Programs (x86)\Passwords Manager` can require elevated permissions
 - If you run the installer over an older version, it will migrate supported data files automatically before reinstalling
 - The application keeps backward compatibility with older Windows layouts by searching current and legacy data paths
 
