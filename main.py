@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from src.lib.shortcuts import (
     ensure_platform_shortcuts_best_effort,
     ensure_windows_start_menu_shortcut_best_effort,
 )
+from src.lib.system import path as system_path
 
 
 def _is_running_from_winget_package():
@@ -27,13 +29,53 @@ def _is_running_from_winget_package():
         return False
 
 
+def _try_relocate_from_winget_package():
+    if not _is_running_from_winget_package():
+        return False
+
+    install_root = Path(system_path())
+    installed_main_exe = install_root / 'passwords-manager.exe'
+    current_main_exe = Path(sys.executable).resolve()
+
+    if installed_main_exe.exists() and installed_main_exe.resolve() != current_main_exe:
+        subprocess.Popen([str(installed_main_exe)], close_fds=True)
+        return True
+
+    installer_candidates = [
+        current_main_exe.parent / 'install-passwords-manager.exe',
+        current_main_exe.parent.parent / 'install-passwords-manager.exe',
+    ]
+
+    winget_installer = next((candidate for candidate in installer_candidates if candidate.exists()), None)
+    if winget_installer is None:
+        return False
+
+    install_target_argument = f'/D={install_root}'
+
+    try:
+        install_process = subprocess.run(
+            [str(winget_installer), '/S', install_target_argument],
+            check=False,
+            timeout=600,
+        )
+    except Exception:
+        return False
+
+    if install_process.returncode != 0:
+        return False
+
+    if not installed_main_exe.exists():
+        return False
+
+    subprocess.Popen([str(installed_main_exe)], close_fds=True)
+    return True
+
+
 if __name__ == '__main__':
-    if _is_running_from_winget_package():
-        # Winget installs can run in user package paths without installer execution.
-        # Ensure Start Menu entry exists for discoverability.
-        ensure_windows_start_menu_shortcut_best_effort()
-        app = App()
-    else:
-        ensure_platform_shortcuts_best_effort()
-        app = App()
+    if _try_relocate_from_winget_package():
+        raise SystemExit(0)
+
+    ensure_platform_shortcuts_best_effort()
+    ensure_windows_start_menu_shortcut_best_effort()
+    app = App()
     app.mainloop()

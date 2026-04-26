@@ -108,6 +108,8 @@ InstallModes:
 InstallerSwitches:
   Silent: /S
   SilentWithProgress: /S
+  Custom: /S /D="$fixedInstallLocation"
+InstallLocationRequired: true
 AppsAndFeaturesEntries:
   - DisplayName: Passwords Manager
     Publisher: $Publisher

@@ -848,3 +848,39 @@ class Install(ctk.CTk):
 		if self.installing:
 			return
 		self.destroy()
+
+
+def run_non_interactive_install(installation_directory=None):
+	"""Run installer logic without UI interaction (used by winget silent mode)."""
+	destination = Path(installation_directory).expanduser() if installation_directory else Path(system_path())
+	installer = Install()
+	error_message = {'value': None}
+
+	def _silent_after(_delay, callback, *args):
+		if callback in (messagebox.showinfo, messagebox.showerror, messagebox.showwarning):
+			return None
+		return callback(*args)
+
+	def _capture_error(message):
+		error_message['value'] = message
+
+	try:
+		installer.withdraw()
+		installer.after = _silent_after
+		installer._on_install_success = lambda *_args, **_kwargs: None
+		installer._on_install_error = _capture_error
+
+		is_update = installer._is_existing_installation(destination) or installer._has_legacy_installation()
+		installer._install_worker(destination, is_update)
+
+		if error_message['value']:
+			return 1
+
+		return 0
+	except Exception:
+		return 1
+	finally:
+		try:
+			installer.destroy()
+		except Exception:
+			pass
