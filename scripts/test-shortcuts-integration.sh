@@ -27,6 +27,13 @@ else
     exit 1
 fi
 
+# Skip test on Linux without display (CI environment)
+if [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
+    echo "Skipping test: Linux without display environment (CI detected)"
+    echo "This is expected in CI/CD environments without X11/Wayland display."
+    exit 0
+fi
+
 echo "Testing shortcut creation on app startup..."
 echo ""
 
@@ -40,12 +47,25 @@ else
 fi
 
 echo ""
-echo "Running app (press Ctrl+C to exit after it starts)..."
+echo "Running app (will timeout after 8 seconds)..."
 cd "$PROJECT_ROOT"
 
-# Try to run and give it a moment to create shortcuts
-timeout 3 python main.py || true
-sleep 1
+# Try to run with timeout (use gtimeout on macOS if available, fall back to shell background job)
+if command -v gtimeout &> /dev/null; then
+    # macOS with coreutils installed
+    gtimeout 8 python main.py || true
+elif command -v timeout &> /dev/null; then
+    # Linux timeout command
+    timeout 8 python main.py || true
+else
+    # Fallback: background job with kill
+    python main.py &
+    APP_PID=$!
+    sleep 8
+    kill $APP_PID 2>/dev/null || true
+    wait $APP_PID 2>/dev/null || true
+fi
+sleep 2
 
 echo ""
 echo "Checking shortcut creation..."

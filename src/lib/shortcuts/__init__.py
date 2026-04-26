@@ -13,6 +13,12 @@ from src.lib.windows_shortcuts import (
 def _runtime_executable():
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).resolve()
+    
+    # In development mode, use Python executable running main.py
+    main_script = Path(__file__).resolve().parent.parent.parent / 'main.py'
+    if main_script.exists():
+        return Path(sys.executable).resolve()
+    
     return None
 
 
@@ -34,6 +40,20 @@ def _ensure_windows_shortcuts(main_executable):
             ('Uninstall Passwords Manager.lnk', uninstall_target, 'Uninstall Passwords Manager')
         )
 
+    # Determine working directory and arguments based on frozen/development mode
+    if getattr(sys, 'frozen', False):
+        working_dir = main_executable.parent
+        main_arguments = None
+        uninstall_arguments = None
+    else:
+        # Development mode: main_executable is Python, pass main.py as argument
+        working_dir = Path(__file__).resolve().parent.parent.parent
+        main_py = working_dir / 'main.py'
+        main_arguments = f'"{main_py}"' if main_py.exists() else None
+        
+        uninstall_py = working_dir / 'uninstall.py'
+        uninstall_arguments = f'"{uninstall_py}"' if uninstall_py.exists() else None
+
     for start_menu_dir in windows_start_menu_directories():
         try:
             start_menu_dir.mkdir(parents=True, exist_ok=True)
@@ -43,8 +63,18 @@ def _ensure_windows_shortcuts(main_executable):
 
         for shortcut_name, target_executable, description in shortcut_definitions:
             shortcut_path = start_menu_dir / shortcut_name
+            
+            # Use appropriate arguments based on shortcut type
+            arguments = main_arguments if 'Passwords Manager.lnk' in shortcut_name else uninstall_arguments
+            
             try:
-                create_windows_shortcut(shortcut_path, target_executable, main_executable.parent, description)
+                create_windows_shortcut(
+                    shortcut_path, 
+                    target_executable, 
+                    working_dir, 
+                    description,
+                    arguments=arguments
+                )
                 created.append(str(shortcut_path))
             except Exception as shortcut_error:
                 failures.append(f'{shortcut_path}: {shortcut_error}')
@@ -61,8 +91,9 @@ def _ensure_windows_shortcuts(main_executable):
             create_windows_shortcut(
                 desktop_shortcut,
                 main_executable,
-                main_executable.parent,
+                working_dir,
                 'Passwords Manager',
+                arguments=main_arguments
             )
             created.append(str(desktop_shortcut))
         except Exception as shortcut_error:
@@ -116,7 +147,17 @@ def _ensure_linux_shortcuts(main_executable):
 
     app_entry = app_dir / 'passwords-manager.desktop'
     uninstall_entry = app_dir / 'passwords-manager-uninstall.desktop'
-    uninstall_script = main_executable.parent / 'uninstall.sh'
+    
+    # In development mode, main_executable might be python executable
+    # We need to construct the command properly
+    if getattr(sys, 'frozen', False):
+        exec_command = f'"{main_executable}"'
+        uninstall_script = main_executable.parent / 'uninstall.sh'
+    else:
+        # Development mode: run main.py with python
+        main_py = Path(__file__).resolve().parent.parent.parent / 'main.py'
+        exec_command = f'"{main_executable}" "{main_py}"'
+        uninstall_script = Path(__file__).resolve().parent.parent.parent / 'uninstall.py'
 
     app_entry.write_text(
         (
@@ -124,7 +165,7 @@ def _ensure_linux_shortcuts(main_executable):
             'Type=Application\n'
             'Version=1.0\n'
             'Name=Passwords Manager\n'
-            f'Exec="{main_executable}"\n'
+            f'Exec={exec_command}\n'
             'Terminal=false\n'
             'Categories=Utility;Security;\n'
         ),
@@ -140,7 +181,7 @@ def _ensure_linux_shortcuts(main_executable):
                 'Type=Application\n'
                 'Version=1.0\n'
                 'Name=Uninstall Passwords Manager\n'
-                f'Exec="{uninstall_script}"\n'
+                f'Exec="{main_executable}" "{uninstall_script}"\n'
                 'Terminal=true\n'
                 'Categories=Utility;\n'
             ),
@@ -158,15 +199,26 @@ def _ensure_macos_shortcuts(main_executable):
     app_dir.mkdir(parents=True, exist_ok=True)
 
     app_launcher = app_dir / 'Passwords Manager.command'
-    app_launcher.write_text(f'#!/bin/bash\n"{main_executable}"\n', encoding='utf-8')
+    
+    # In development mode, main_executable might be python executable
+    if getattr(sys, 'frozen', False):
+        app_launcher.write_text(f'#!/bin/bash\n"{main_executable}"\n', encoding='utf-8')
+    else:
+        # Development mode: run main.py with python
+        main_py = Path(__file__).resolve().parent.parent.parent / 'main.py'
+        app_launcher.write_text(f'#!/bin/bash\n"{main_executable}" "{main_py}"\n', encoding='utf-8')
+    
     app_launcher.chmod(0o755)
 
     created = [str(app_launcher)]
 
-    uninstall_script = main_executable.parent / 'uninstall.sh'
+    uninstall_script = Path(__file__).resolve().parent.parent.parent / 'uninstall.py'
+    if getattr(sys, 'frozen', False):
+        uninstall_script = main_executable.parent / 'uninstall.sh'
+    
     uninstall_launcher = app_dir / 'Uninstall Passwords Manager.command'
     if uninstall_script.exists():
-        uninstall_launcher.write_text(f'#!/bin/bash\n"{uninstall_script}"\n', encoding='utf-8')
+        uninstall_launcher.write_text(f'#!/bin/bash\n"{main_executable}" "{uninstall_script}"\n', encoding='utf-8')
         uninstall_launcher.chmod(0o755)
         created.append(str(uninstall_launcher))
     else:

@@ -45,7 +45,7 @@ def windows_desktop_directories():
     return _dedupe_paths(directories)
 
 
-def create_windows_shortcut(shortcut_path, target_exe, working_dir, description):
+def create_windows_shortcut(shortcut_path, target_exe, working_dir, description, arguments=None):
     def _escape_vbs(value):
         return str(value).replace('"', '""')
 
@@ -61,8 +61,13 @@ def create_windows_shortcut(shortcut_path, target_exe, working_dir, description)
         f'shortcut.WorkingDirectory = "{working_dir_str}"\n'
         f'shortcut.IconLocation = "{target_exe_str},0"\n'
         f'shortcut.Description = "{description_str}"\n'
-        'shortcut.Save\n'
     )
+    
+    if arguments:
+        arguments_str = _escape_vbs(arguments)
+        vbs_script += f'shortcut.Arguments = "{arguments_str}"\n'
+    
+    vbs_script += 'shortcut.Save\n'
 
     script_file = None
     script_path = None

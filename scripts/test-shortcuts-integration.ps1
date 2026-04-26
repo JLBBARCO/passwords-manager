@@ -45,19 +45,19 @@ else {
 }
 
 Write-Host ""
-Write-Host "Running app (will timeout after 3 seconds)..." -ForegroundColor Yellow
+Write-Host "Running app (will timeout after 8 seconds)..." -ForegroundColor Yellow
 
 Push-Location $ProjectRoot
 
-# Start app with 3-second timeout
+# Start app with 8-second timeout (give app time to create shortcuts before closing)
 $process = Start-Process python -ArgumentList "main.py" -PassThru -NoNewWindow -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 8
 $process | Stop-Process -Force -ErrorAction SilentlyContinue
 Wait-Process -InputObject $process -ErrorAction SilentlyContinue
 
 Pop-Location
 
-Start-Sleep -Seconds 1
+Start-Sleep -Seconds 2
 
 Write-Host ""
 Write-Host "Checking shortcut creation..."
