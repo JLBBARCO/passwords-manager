@@ -340,7 +340,13 @@ jobs:
                     exit 1
                   fi
                   mkdir -p release-assets
-                  { yes || true; } | buildozer android debug
+                  { yes || true; } | buildozer -v android debug 2>&1 | tee buildozer-android.log
+                  BUILD_STATUS=${PIPESTATUS[1]}
+                  if [[ ${BUILD_STATUS} -ne 0 ]]; then
+                    echo "--- buildozer last lines ---"
+                    tail -n 200 buildozer-android.log || true
+                    exit ${BUILD_STATUS}
+                  fi
                   APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
                   if [[ -z "${APK_PATH}" ]]; then
                     echo "Android APK not found" >&2
