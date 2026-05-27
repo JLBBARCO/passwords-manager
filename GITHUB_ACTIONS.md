@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository uses a single GitHub Actions workflow, [build-release.yml](.github/workflows/build-release.yml), to build Passwords Manager on Windows, macOS, Linux, and Android.
+This repository uses a single GitHub Actions workflow, [build-release.yml](.github/workflows/build-release.yml), to build Passwords Manager on Windows, macOS, and Linux.
 
 The workflow:
 
@@ -10,7 +10,7 @@ The workflow:
 2. Packages the platform-specific installers
 3. Creates a GitHub Release
 4. Computes SHA-256 hashes for the release assets
-5. Publishes to WinGet, Homebrew, and F-Droid
+5. Publishes to WinGet and Homebrew
 6. Refreshes the screenshot assets and commits them back to the repository
 
 ## Branch Behavior
@@ -23,20 +23,17 @@ The workflow:
 - Windows: `passwords-manager-windows-installer.exe`, `install-passwords-manager.exe`, and `passwords-manager-windows.zip`
 - macOS: `passwords-manager-macos.dmg` and `passwords-manager-macos.tar.gz`
 - Linux: `passwords-manager-linux.AppImage` and `passwords-manager-linux.tar.gz`
-- Android: `passwords-manager-android.apk`
 - Hash file: `SHA256SUMS.txt`
 
 ## Publication Targets
 
 - WinGet uses the `JLBBARCO/winget-pkbs` fork
 - Homebrew uses the `JLBBARCO/homebrew-tap` repository
-- F-Droid uses the configured metadata repository
 
 ## Required Secrets
 
 - `WINGET_PKGS_TOKEN`
 - `HOMEBREW_TAP_TOKEN`
-- `FDROID_METADATA_TOKEN`
 
 ## Local Installation
 

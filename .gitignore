@@ -24,7 +24,6 @@ passwords_manager.spec
 build/
 dist/
 *.spec
-!buildozer.spec
 
 # Build outputs
 release/

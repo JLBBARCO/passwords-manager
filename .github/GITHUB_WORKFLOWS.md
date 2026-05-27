@@ -6,7 +6,7 @@ This directory contains the automated release pipeline for Passwords Manager.
 
 Only one release workflow remains active:
 
-- [build-release.yml](workflows/build-release.yml) - builds Windows, macOS, Linux, and Android on `main` and `develop`, packages installers, creates the GitHub Release, publishes to WinGet, Homebrew, and F-Droid, refreshes screenshots, and commits the updated assets back to the repository.
+- [build-release.yml](workflows/build-release.yml) - builds Windows, macOS, and Linux on `main` and `develop`, packages installers, creates the GitHub Release, publishes to WinGet and Homebrew, refreshes screenshots, and commits the updated assets back to the repository.
 
 ## Branch behavior
 
@@ -17,13 +17,11 @@ Only one release workflow remains active:
 
 - Windows installer publication uses the `JLBBARCO/winget-pkbs` fork.
 - Homebrew publication uses the `JLBBARCO/homebrew-tap` repository.
-- Android metadata publication uses the configured F-Droid metadata repository.
 
 ## Required secrets
 
 - `WINGET_PKGS_TOKEN`
 - `HOMEBREW_TAP_TOKEN`
-- `FDROID_METADATA_TOKEN`
 
 ## Notes
 

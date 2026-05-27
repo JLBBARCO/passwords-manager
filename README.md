@@ -155,28 +155,6 @@ brew tap JLBBARCO/homebrew-tap
 brew install passwords-manager-beta
 ```
 
-### Android (APK)
-
-The unified GitHub Actions workflow now also builds the Android APK and publishes the metadata needed for F-Droid submission.
-
-Current project status:
-
-- Android mobile UI created with Kivy in `android/main.py`
-- Build configuration created in `buildozer.spec`
-- Android now includes local password persistence (`save`, `list`, `remove`) via `android/storage.py`
-- Encryption is enabled when `cryptography` is available in the runtime; otherwise it falls back to plain text for compatibility
-- The release workflow builds the APK automatically on `main` and `develop`
-
-Current limitation:
-
-1. The APK currently implements a mobile subset of desktop features
-
-To migrate full functionality to Android, next steps are:
-
-1. Add search/filter and password generator flows to the Android UI
-2. Sync advanced desktop flows (import/export and migration controls)
-3. Add Android-specific UX flows (secure clipboard behavior, share intents, backup/restore)
-
 ### � Pre-Compiled Executables
 
 Download the latest version compiled automatically:
@@ -192,7 +170,6 @@ Available for:
 - **macOS portable**: `passwords-manager-macos.tar.gz`
 - **Linux installer**: `passwords-manager-linux.AppImage`
 - **Linux portable**: `passwords-manager-linux.tar.gz`
-- **Android**: `passwords-manager-android.apk`
 
 Executables are automatically compiled via GitHub Actions with each update.
 

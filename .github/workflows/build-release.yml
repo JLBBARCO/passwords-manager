@@ -19,7 +19,6 @@ env:
     APP_NAME: Passwords Manager
     WINGET_REPOSITORY: JLBBARCO/winget-pkbs
     HOMEBREW_TAP_REPOSITORY: JLBBARCO/homebrew-tap
-    FDROID_REPOSITORY: JLBBARCO/fdroid-data
 
 jobs:
     prepare-release-context:
@@ -238,31 +237,6 @@ jobs:
                   HERE="$(dirname "$(readlink -f "$0")")"
                   exec "$HERE/usr/bin/passwords-manager" "$@"
                   EOF
-                  chmod +x release-assets/AppDir/AppRun
-
-            - name: Download linuxdeploy tool
-              shell: bash
-              run: |
-                  wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O linuxdeploy.AppImage
-                  chmod +x linuxdeploy.AppImage
-
-            - name: Package Linux AppImage
-              shell: bash
-              run: |
-                  ./linuxdeploy.AppImage --appdir release-assets/AppDir --desktop-file release-assets/AppDir/passwords-manager.desktop --output appimage
-                  APPIMAGE_PATH=$(find . -type f -name '*.AppImage' ! -name 'linuxdeploy.AppImage' | sort | head -n 1)
-                  if [[ -z "${APPIMAGE_PATH}" ]]; then
-                    echo "Linux AppImage not found" >&2
-                    exit 1
-                  fi
-                  cp "${APPIMAGE_PATH}" release-assets/passwords-manager-linux.AppImage
-                  chmod +x release-assets/passwords-manager-linux.AppImage
-                  test -f release-assets/passwords-manager-linux.AppImage
-
-            - name: Capture Linux screenshot
-              shell: bash
-              run: |
-                  xvfb-run -a python scripts/capture_release_screenshot.py --executable "release-assets/passwords-manager-linux.AppImage" --output "release-assets/linux.webp" --os linux
 
             - name: Upload Linux artifacts
               uses: actions/upload-artifact@v4
@@ -273,96 +247,6 @@ jobs:
                       release-assets/passwords-manager-linux.AppImage
                       release-assets/linux.webp
 
-    build-android:
-        if: github.actor != 'github-actions[bot]'
-        needs: [prepare-release-context]
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
-
-            - name: Install Android build dependencies
-              shell: bash
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf automake m4 libtool libltdl-dev pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo6 cmake libffi-dev libssl-dev
-                  python -m pip install --upgrade pip
-                  python -m pip install -r requirements.txt buildozer==1.5.0 cython==0.29.36
-                  # Ensure ANDROID_SDK_ROOT is defined and cmdline-tools are installed in the runner
-                  export ANDROID_SDK_ROOT="${HOME}/Android/Sdk"
-                  export ANDROID_HOME="$ANDROID_SDK_ROOT"
-                  mkdir -p "$ANDROID_SDK_ROOT"
-                  if [ ! -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ]; then
-                    mkdir -p /tmp/cmdline && cd /tmp/cmdline
-                    curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip" -o cmdline-tools.zip
-                    unzip -q cmdline-tools.zip
-                    mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-                    mv cmdline-tools/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/" || true
-                  fi
-                  export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-                  { yes || true; } | sdkmanager --licenses > /dev/null
-                  sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;33.0.2" "build-tools;37.0.0"
-
-            - name: Build Android APK
-              shell: bash
-              working-directory: ${{ github.workspace }}
-              env:
-                  PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  pwd
-                  # Ensure ANDROID_SDK_ROOT and sdktools are available in this shell as well
-                  export ANDROID_SDK_ROOT="${HOME}/Android/Sdk"
-                  export ANDROID_HOME="$ANDROID_SDK_ROOT"
-                  export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-
-                  # Debug: print environment and SDK layout to assist CI diagnosis
-                  echo "--- Environment ---"
-                  env | sort
-                  echo "--- Java version ---"
-                  java -version || true
-                  echo "--- sdkmanager --list ---"
-                  sdkmanager --list || true
-                  echo "--- ANDROID_SDK_ROOT contents ---"
-                  ls -la "$ANDROID_SDK_ROOT" || true
-                  echo "--- cmdline-tools contents ---"
-                  ls -la "$ANDROID_SDK_ROOT/cmdline-tools" || true
-                  echo "--- buildozer info ---"
-                  buildozer --version || true
-                  buildozer android debug --help >/dev/null 2>&1 || true
-
-                  if [[ ! -f "${GITHUB_WORKSPACE}/buildozer.spec" ]]; then
-                    echo "buildozer.spec not found at ${GITHUB_WORKSPACE}/buildozer.spec" >&2
-                    exit 1
-                  fi
-                  mkdir -p release-assets
-                  { yes || true; } | buildozer -v android debug 2>&1 | tee buildozer-android.log
-                  BUILD_STATUS=${PIPESTATUS[1]}
-                  if [[ ${BUILD_STATUS} -ne 0 ]]; then
-                    echo "--- buildozer last lines ---"
-                    tail -n 200 buildozer-android.log || true
-                    exit ${BUILD_STATUS}
-                  fi
-                  APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
-                  if [[ -z "${APK_PATH}" ]]; then
-                    echo "Android APK not found" >&2
-                    exit 1
-                  fi
-                  cp "${APK_PATH}" release-assets/passwords-manager-android.apk
-                  python scripts/generate_screenshots.py --os android --output release-assets/android.webp
-
-            - name: Upload Android artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: android-release-assets
-                  path: |
-                      release-assets/passwords-manager-android.apk
-                      release-assets/android.webp
-
     create-release:
         if: github.actor != 'github-actions[bot]'
         needs:
@@ -370,7 +254,6 @@ jobs:
             - build-windows
             - build-macos
             - build-linux
-            - build-android
         runs-on: ubuntu-latest
         outputs:
             release_tag: ${{ steps.release.outputs.release_tag }}
@@ -392,7 +275,7 @@ jobs:
               shell: bash
               run: |
                   mkdir -p release-package
-                  find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.tar.gz' -o -name '*.apk' -o -name '*.zip' \) -exec cp {} release-package/ \;
+                  find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release-package/ \;
                   sha256sum release-package/* > release-package/SHA256SUMS.txt
                   cat release-package/SHA256SUMS.txt
 
@@ -589,75 +472,9 @@ jobs:
                   git -C homebrew-tap commit -m "Publish Passwords Manager ${VERSION}"
                   git -C homebrew-tap push
 
-    publish-fdroid:
-        if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
-        needs: [prepare-release-context, create-release]
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-
-            - name: Verify F-Droid token
-              shell: bash
-              env:
-                  FDROID_TOKEN: ${{ secrets.FDROID_METADATA_TOKEN }}
-              run: |
-                  if [[ -z "${FDROID_TOKEN}" ]]; then
-                    echo "FDROID_METADATA_TOKEN secret is required to publish to ${FDROID_REPOSITORY}." >&2
-                    exit 1
-                  fi
-
-            - name: Clone F-Droid metadata repository
-              shell: bash
-              env:
-                  FDROID_TOKEN: ${{ secrets.FDROID_METADATA_TOKEN }}
-              run: |
-                  rm -rf fdroid-data
-                  git clone "https://x-access-token:${FDROID_TOKEN}@github.com/${FDROID_REPOSITORY}.git" fdroid-data
-
-            - name: Render F-Droid metadata
-              shell: bash
-              env:
-                  VERSION: ${{ needs.prepare-release-context.outputs.version }}
-                  RELEASE_TAG: ${{ needs.prepare-release-context.outputs.release_tag }}
-              run: |
-                  mkdir -p fdroid-data/metadata
-                  cat > fdroid-data/metadata/com.jlbbarco.passwordsmanager.yml <<EOF
-                  Categories:
-                    - Security
-                  License: MIT
-                  AuthorName: JLBBARCO
-                  SourceCode: https://github.com/JLBBARCO/passwords-manager
-                  IssueTracker: https://github.com/JLBBARCO/passwords-manager/issues
-                  AutoName: Passwords Manager
-                  RepoType: git
-                  Repo: https://github.com/JLBBARCO/passwords-manager.git
-                  Builds:
-                    - versionName: ${VERSION}
-                      versionCode: ${GITHUB_RUN_NUMBER}
-                      commit: ${RELEASE_TAG}
-                      subdir: android
-                      output: bin/*.apk
-                  EOF
-
-            - name: Publish F-Droid metadata
-              shell: bash
-              env:
-                  VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  git -C fdroid-data config user.name "github-actions[bot]"
-                  git -C fdroid-data config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git -C fdroid-data add metadata/com.jlbbarco.passwordsmanager.yml
-                  if git -C fdroid-data diff --cached --quiet; then
-                    echo "No F-Droid metadata changes to publish."
-                    exit 0
-                  fi
-                  git -C fdroid-data commit -m "Publish Passwords Manager ${VERSION}"
-                  git -C fdroid-data push
-
     refresh-screenshots:
         if: github.actor != 'github-actions[bot]'
-        needs: [build-windows, build-macos, build-linux, build-android]
+        needs: [build-windows, build-macos, build-linux]
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
@@ -677,15 +494,14 @@ jobs:
                   cp release-assets/windows.webp src/assets/screenshot/windows.webp
                   cp release-assets/macos.webp src/assets/screenshot/macos.webp
                   cp release-assets/linux.webp src/assets/screenshot/linux.webp
-                  cp release-assets/android.webp src/assets/screenshot/android.webp
-                  python scripts/generate_screenshots.py --compose-thumbnail --output src/assets/img/thumbnail.webp --inputs src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp src/assets/screenshot/android.webp
+                  python scripts/generate_screenshots.py --compose-thumbnail --output src/assets/img/thumbnail.webp --inputs src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp
 
             - name: Commit screenshot refresh
               shell: bash
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git add src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp src/assets/screenshot/android.webp src/assets/img/thumbnail.webp
+                  git add src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp src/assets/img/thumbnail.webp
                   if git diff --cached --quiet; then
                     echo "No screenshot updates to commit."
                     exit 0
