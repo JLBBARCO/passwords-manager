@@ -5,7 +5,6 @@
 ![Passwords Manager UI](src/assets/img/thumbnail.webp)
 
 [![Build and Release](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-release.yml/badge.svg)](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-release.yml)
-[![Build Android APK](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-android-apk.yml/badge.svg)](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-android-apk.yml)
 [![Latest Release](https://img.shields.io/github/v/release/JLBBARCO/passwords-manager?include_prereleases&label=latest)](https://github.com/JLBBARCO/passwords-manager/releases/latest)
 [![License](https://img.shields.io/github/license/JLBBARCO/passwords-manager)](LICENSE)
 
@@ -158,7 +157,7 @@ brew install passwords-manager-beta
 
 ### Android (APK)
 
-An automatic workflow for APK generation is now available at `.github/workflows/build-android-apk.yml`.
+The unified GitHub Actions workflow now also builds the Android APK and publishes the metadata needed for F-Droid submission.
 
 Current project status:
 
@@ -166,7 +165,7 @@ Current project status:
 - Build configuration created in `buildozer.spec`
 - Android now includes local password persistence (`save`, `list`, `remove`) via `android/storage.py`
 - Encryption is enabled when `cryptography` is available in the runtime; otherwise it falls back to plain text for compatibility
-- The workflow builds APK automatically when these files are present and valid
+- The release workflow builds the APK automatically on `main` and `develop`
 
 Current limitation:
 
@@ -186,11 +185,14 @@ Download the latest version compiled automatically:
 
 Available for:
 
-- **Windows**: `passwords-manager-windows.zip`
-- **Windows Installer**: `install-passwords-manager.exe`
-- **Linux**: `passwords-manager-linux.tar.gz`
-- **Linux AppImage**: `passwords-manager-x86_64.AppImage`
-- **macOS**: `passwords-manager-macos.tar.gz`
+- **Windows Installer**: `passwords-manager-windows-installer.exe`
+- **Windows helper**: `install-passwords-manager.exe`
+- **Windows portable**: `passwords-manager-windows.zip`
+- **macOS installer**: `passwords-manager-macos.dmg`
+- **macOS portable**: `passwords-manager-macos.tar.gz`
+- **Linux installer**: `passwords-manager-linux.AppImage`
+- **Linux portable**: `passwords-manager-linux.tar.gz`
+- **Android**: `passwords-manager-android.apk`
 
 Executables are automatically compiled via GitHub Actions with each update.
 
@@ -204,7 +206,7 @@ Prefer to run from source code? See the [Installation](#installation) section ab
 
 ## 🤖 Automatic Build
 
-This project uses GitHub Actions to automatically compile the program with each commit to the main branch. For more information about the build process, see [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
+This project uses GitHub Actions to automatically compile the program on the `main` and `develop` branches. The workflow also creates releases, computes SHA-256 checksums, publishes package metadata, refreshes the screenshots, and commits the updated assets back to the repository.
 
 ## 📚 Documentation
 
