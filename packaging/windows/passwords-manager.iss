@@ -24,10 +24,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "..\..\release-assets\passwords-manager-windows.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\release-assets\install-passwords-manager.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "ENCRYPTION.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "src\assets\icon\passwords-manager.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\ENCRYPTION.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\src\assets\icon\passwords-manager.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Passwords Manager"; Filename: "{app}\passwords-manager-windows.exe"

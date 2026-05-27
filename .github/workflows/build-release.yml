@@ -292,19 +292,21 @@ jobs:
 
             - name: Build Android APK
               shell: bash
+              working-directory: ${{ github.workspace }}
               env:
                   PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
               run: |
-                  cd "${GITHUB_WORKSPACE}"
-                  mkdir -p release-assets
-                  buildozer android debug
-                  APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
-                  if [[ -z "${APK_PATH}" ]]; then
-                    echo "Android APK not found" >&2
-                    exit 1
-                  fi
-                  cp "${APK_PATH}" release-assets/passwords-manager-android.apk
-                  python scripts/generate_screenshots.py --os android --output release-assets/android.webp
+                  pwd
+                  test -f buildozer.spec
+                    mkdir -p release-assets
+                    buildozer android debug
+                    APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
+                    if [[ -z "${APK_PATH}" ]]; then
+                      echo "Android APK not found" >&2
+                      exit 1
+                    fi
+                    cp "${APK_PATH}" release-assets/passwords-manager-android.apk
+                    python scripts/generate_screenshots.py --os android --output release-assets/android.webp
 
             - name: Upload Android artifacts
               uses: actions/upload-artifact@v4

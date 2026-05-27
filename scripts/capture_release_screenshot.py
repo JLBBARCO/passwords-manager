@@ -13,6 +13,7 @@ from PIL import ImageGrab
 
 
 def capture_screen(executable: Path, output: Path, os_name: str, delay: float) -> None:
+    executable = executable.resolve()
     process = subprocess.Popen([str(executable)], cwd=str(executable.parent))
     try:
         time.sleep(delay)
