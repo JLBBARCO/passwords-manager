@@ -295,6 +295,7 @@ jobs:
                   python -m pip install -r requirements.txt buildozer==1.5.0 cython==0.29.36
                   # Ensure ANDROID_SDK_ROOT is defined and cmdline-tools are installed in the runner
                   export ANDROID_SDK_ROOT="${HOME}/Android/Sdk"
+                  export ANDROID_HOME="$ANDROID_SDK_ROOT"
                   mkdir -p "$ANDROID_SDK_ROOT"
                   if [ ! -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ]; then
                     mkdir -p /tmp/cmdline && cd /tmp/cmdline
@@ -305,7 +306,7 @@ jobs:
                   fi
                   export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
                   { yes || true; } | sdkmanager --licenses > /dev/null
-                  sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+                  sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;33.0.2" "build-tools;37.0.0"
 
             - name: Build Android APK
               shell: bash
@@ -316,6 +317,7 @@ jobs:
                   pwd
                   # Ensure ANDROID_SDK_ROOT and sdktools are available in this shell as well
                   export ANDROID_SDK_ROOT="${HOME}/Android/Sdk"
+                  export ANDROID_HOME="$ANDROID_SDK_ROOT"
                   export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
                   # Debug: print environment and SDK layout to assist CI diagnosis
