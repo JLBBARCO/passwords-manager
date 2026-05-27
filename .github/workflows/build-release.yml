@@ -110,7 +110,11 @@ jobs:
                   PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
               run: |
                   iscc /Qp /DAppVersion="$env:PASSWORDS_MANAGER_VERSION" packaging/windows/passwords-manager.iss
-                  Copy-Item "output\passwords-manager-windows-installer.exe" "release-assets\passwords-manager-windows-installer.exe"
+                  $installer = Get-ChildItem -Path . -Filter passwords-manager-windows-installer.exe -Recurse | Select-Object -First 1
+                  if (-not $installer) {
+                    throw "Windows installer not found after Inno Setup build."
+                  }
+                  Copy-Item $installer.FullName "release-assets\passwords-manager-windows-installer.exe"
 
             - name: Capture Windows screenshot
               shell: pwsh
@@ -297,16 +301,19 @@ jobs:
                   PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
               run: |
                   pwd
-                  test -f buildozer.spec
-                    mkdir -p release-assets
-                    buildozer android debug
-                    APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
-                    if [[ -z "${APK_PATH}" ]]; then
-                      echo "Android APK not found" >&2
-                      exit 1
-                    fi
-                    cp "${APK_PATH}" release-assets/passwords-manager-android.apk
-                    python scripts/generate_screenshots.py --os android --output release-assets/android.webp
+                  if [[ ! -f "${GITHUB_WORKSPACE}/buildozer.spec" ]]; then
+                    echo "buildozer.spec not found at ${GITHUB_WORKSPACE}/buildozer.spec" >&2
+                    exit 1
+                  fi
+                  mkdir -p release-assets
+                  buildozer android debug
+                  APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
+                  if [[ -z "${APK_PATH}" ]]; then
+                    echo "Android APK not found" >&2
+                    exit 1
+                  fi
+                  cp "${APK_PATH}" release-assets/passwords-manager-android.apk
+                  python scripts/generate_screenshots.py --os android --output release-assets/android.webp
 
             - name: Upload Android artifacts
               uses: actions/upload-artifact@v4
