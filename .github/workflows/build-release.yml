@@ -308,7 +308,7 @@ jobs:
                     exit 1
                   fi
                   mkdir -p release-assets
-                  buildozer android debug
+                  { yes || true; } | buildozer android debug
                   APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
                   if [[ -z "${APK_PATH}" ]]; then
                     echo "Android APK not found" >&2
