@@ -293,6 +293,8 @@ jobs:
                   sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf automake m4 libtool libltdl-dev pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo6 cmake libffi-dev libssl-dev
                   python -m pip install --upgrade pip
                   python -m pip install -r requirements.txt buildozer==1.5.0 cython==0.29.36
+                  yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses
+                  "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
             - name: Build Android APK
               shell: bash
