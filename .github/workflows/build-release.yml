@@ -163,8 +163,8 @@ jobs:
             - name: Package macOS disk image
               shell: bash
               run: |
+                  rm -f release-assets/passwords-manager-macos.dmg
                   create-dmg \
-                    --overwrite \
                     --volname "Passwords Manager" \
                     --window-size 540 380 \
                     --icon-size 128 \
@@ -246,8 +246,14 @@ jobs:
               shell: bash
               run: |
                   ./linuxdeploy.AppImage --appdir release-assets/AppDir --desktop-file release-assets/AppDir/passwords-manager.desktop --output appimage
-                  APPIMAGE_PATH=$(find . -maxdepth 1 -type f -name '*.AppImage' ! -name 'linuxdeploy.AppImage' | head -n 1)
-                  mv "${APPIMAGE_PATH}" release-assets/passwords-manager-linux.AppImage
+                  APPIMAGE_PATH=$(find . -type f -name '*.AppImage' ! -name 'linuxdeploy.AppImage' | sort | head -n 1)
+                  if [[ -z "${APPIMAGE_PATH}" ]]; then
+                    echo "Linux AppImage not found" >&2
+                    exit 1
+                  fi
+                  cp "${APPIMAGE_PATH}" release-assets/passwords-manager-linux.AppImage
+                  chmod +x release-assets/passwords-manager-linux.AppImage
+                  test -f release-assets/passwords-manager-linux.AppImage
 
             - name: Capture Linux screenshot
               shell: bash
@@ -289,6 +295,7 @@ jobs:
               env:
                   PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
               run: |
+                  cd "${GITHUB_WORKSPACE}"
                   mkdir -p release-assets
                   buildozer android debug
                   APK_PATH=$(find .buildozer -path '*/bin/*.apk' | head -n 1)
