@@ -318,6 +318,21 @@ jobs:
                   export ANDROID_SDK_ROOT="${HOME}/Android/Sdk"
                   export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
+                  # Debug: print environment and SDK layout to assist CI diagnosis
+                  echo "--- Environment ---"
+                  env | sort
+                  echo "--- Java version ---"
+                  java -version || true
+                  echo "--- sdkmanager --list ---"
+                  sdkmanager --list || true
+                  echo "--- ANDROID_SDK_ROOT contents ---"
+                  ls -la "$ANDROID_SDK_ROOT" || true
+                  echo "--- cmdline-tools contents ---"
+                  ls -la "$ANDROID_SDK_ROOT/cmdline-tools" || true
+                  echo "--- buildozer info ---"
+                  buildozer --version || true
+                  buildozer android debug --help >/dev/null 2>&1 || true
+
                   if [[ ! -f "${GITHUB_WORKSPACE}/buildozer.spec" ]]; then
                     echo "buildozer.spec not found at ${GITHUB_WORKSPACE}/buildozer.spec" >&2
                     exit 1
