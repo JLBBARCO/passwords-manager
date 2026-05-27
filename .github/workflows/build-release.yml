@@ -399,7 +399,7 @@ jobs:
                   echo "release_url=https://github.com/JLBBARCO/passwords-manager/releases/tag/${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
 
     publish-winget:
-        if: github.actor != 'github-actions[bot]'
+        if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
         needs: [prepare-release-context, create-release]
         runs-on: ubuntu-latest
         steps:
@@ -457,7 +457,7 @@ jobs:
                   git -C winget-pkgs push
 
     publish-homebrew:
-        if: github.actor != 'github-actions[bot]'
+        if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
         needs: [prepare-release-context, create-release]
         runs-on: ubuntu-latest
         steps:
@@ -543,7 +543,7 @@ jobs:
                   git -C homebrew-tap push
 
     publish-fdroid:
-        if: github.actor != 'github-actions[bot]'
+        if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
         needs: [prepare-release-context, create-release]
         runs-on: ubuntu-latest
         steps:
