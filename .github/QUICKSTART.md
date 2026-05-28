@@ -13,8 +13,9 @@ git commit -m "feat: new feature"
 git push origin main
 
 # 3. Wait ~5-10 minutes
-# A new version tag will be created automatically,
-# then release + Winget + Homebrew will be published!
+# A latest release will be created automatically on main,
+# or a pre-release will be created on develop.
+# The workflow then publishes the installers, package metadata, and screenshots.
 
 # 4. Access the release
 # https://github.com/JLBBARCO/passwords-manager/releases/latest
@@ -32,7 +33,7 @@ git tag v1.0.0
 git push origin v1.0.0
 
 # 3. Wait for build
-# The release v1.0.0 will be created automatically!
+# The release for that version will be created automatically!
 ```
 
 ### Local Build (Test)
@@ -56,7 +57,7 @@ build.bat
 1. Visit: [Latest Release](https://github.com/JLBBARCO/passwords-manager/releases/latest)
 
 2. Download:
-   - **Windows**: `passwords-manager-windows.zip`
+   - **Windows**: `passwords-manager-windows-installer.exe` or `passwords-manager-windows.zip`
    - **Linux**: `passwords-manager-linux.tar.gz`
    - **macOS**: `passwords-manager-macos.tar.gz`
 
