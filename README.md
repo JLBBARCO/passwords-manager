@@ -5,7 +5,6 @@
 ![Passwords Manager UI](src/assets/img/thumbnail.webp)
 
 [![Build and Release](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-release.yml/badge.svg)](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-release.yml)
-[![Build Android APK](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-android-apk.yml/badge.svg)](https://github.com/JLBBARCO/passwords-manager/actions/workflows/build-android-apk.yml)
 [![Latest Release](https://img.shields.io/github/v/release/JLBBARCO/passwords-manager?include_prereleases&label=latest)](https://github.com/JLBBARCO/passwords-manager/releases/latest)
 [![License](https://img.shields.io/github/license/JLBBARCO/passwords-manager)](LICENSE)
 
@@ -51,7 +50,7 @@ python migrate_to_encrypted.py
 
 ### Data and Installation Compatibility
 
-- On Windows, the program is installed in `C:\File Programs\Passwords Manager`
+- On Windows, the program is installed in `C:\File Programs (x86)\Passwords Manager`
 - User data is stored in `C:\Users\<user>\AppData\Roaming\Passwords Manager`
 - Compatibility with older versions is maintained by checking previous data/install locations in `AppData\Local`
 - During installation, if a previous version is found in `AppData\Local\Passwords Manager`, the installer migrates `passwords.json` and the encryption key to `AppData\Roaming`, then removes the legacy installation before copying the new version
@@ -82,7 +81,7 @@ python main.py
 
 ### 3. Windows Installation Notes
 
-- Installing into `C:\File Programs\Passwords Manager` can require elevated permissions
+- Installing into `C:\File Programs (x86)\Passwords Manager` can require elevated permissions
 - If you run the installer over an older version, it will migrate supported data files automatically before reinstalling
 - The application keeps backward compatibility with older Windows layouts by searching current and legacy data paths
 
@@ -156,28 +155,6 @@ brew tap JLBBARCO/homebrew-tap
 brew install passwords-manager-beta
 ```
 
-### Android (APK)
-
-An automatic workflow for APK generation is now available at `.github/workflows/build-android-apk.yml`.
-
-Current project status:
-
-- Android mobile UI created with Kivy in `android/main.py`
-- Build configuration created in `buildozer.spec`
-- Android now includes local password persistence (`save`, `list`, `remove`) via `android/storage.py`
-- Encryption is enabled when `cryptography` is available in the runtime; otherwise it falls back to plain text for compatibility
-- The workflow builds APK automatically when these files are present and valid
-
-Current limitation:
-
-1. The APK currently implements a mobile subset of desktop features
-
-To migrate full functionality to Android, next steps are:
-
-1. Add search/filter and password generator flows to the Android UI
-2. Sync advanced desktop flows (import/export and migration controls)
-3. Add Android-specific UX flows (secure clipboard behavior, share intents, backup/restore)
-
 ### � Pre-Compiled Executables
 
 Download the latest version compiled automatically:
@@ -186,11 +163,13 @@ Download the latest version compiled automatically:
 
 Available for:
 
-- **Windows**: `passwords-manager-windows.zip`
-- **Windows Installer**: `install-passwords-manager.exe`
-- **Linux**: `passwords-manager-linux.tar.gz`
-- **Linux AppImage**: `passwords-manager-x86_64.AppImage`
-- **macOS**: `passwords-manager-macos.tar.gz`
+- **Windows Installer**: `passwords-manager-windows-installer.exe`
+- **Windows helper**: `install-passwords-manager.exe`
+- **Windows portable**: `passwords-manager-windows.zip`
+- **macOS installer**: `passwords-manager-macos.dmg`
+- **macOS portable**: `passwords-manager-macos.tar.gz`
+- **Linux installer**: `passwords-manager-linux.AppImage`
+- **Linux portable**: `passwords-manager-linux.tar.gz`
 
 Executables are automatically compiled via GitHub Actions with each update.
 
@@ -204,7 +183,7 @@ Prefer to run from source code? See the [Installation](#installation) section ab
 
 ## 🤖 Automatic Build
 
-This project uses GitHub Actions to automatically compile the program with each commit to the main branch. For more information about the build process, see [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
+This project uses GitHub Actions to automatically compile the program on the `main` and `develop` branches. The workflow also creates releases, computes SHA-256 checksums, publishes package metadata, renders the screenshots from the app UI, and commits the updated assets back to the repository.
 
 ## 📚 Documentation
 

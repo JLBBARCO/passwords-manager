@@ -67,13 +67,15 @@ catch {
 }
 
 $resolvedReleaseTag = Get-DefaultReleaseTag -InputVersion $Version -InputTag $ReleaseTag
+$fixedInstallLocation = 'C:\File Programs (x86)\Passwords Manager'
 
 if (-not $InstallerUrl) {
   $InstallerUrl = "https://github.com/JLBBARCO/passwords-manager/releases/download/$resolvedReleaseTag/install-passwords-manager.exe"
 }
 
 Write-Host "Downloading installer to calculate SHA256..." -ForegroundColor Yellow
-$tempFile = Join-Path $env:TEMP ("passwords-manager-installer-" + $Version + ".exe")
+$tempRoot = if ($env:TEMP) { $env:TEMP } elseif ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+$tempFile = Join-Path $tempRoot ("passwords-manager-installer-" + $Version + ".exe")
 try {
   Download-InstallerWithRetry -Url $InstallerUrl -OutputFile $tempFile
 }
@@ -100,13 +102,19 @@ $installerManifest = @"
 PackageIdentifier: $PackageIdentifier
 PackageVersion: $Version
 InstallerType: exe
-Scope: user
+Scope: machine
 InstallModes:
   - interactive
   - silent
 InstallerSwitches:
   Silent: /S
   SilentWithProgress: /S
+  Custom: /S /D="$fixedInstallLocation"
+InstallLocationRequired: true
+AppsAndFeaturesEntries:
+  - DisplayName: Passwords Manager
+    Publisher: $Publisher
+    InstallLocation: $fixedInstallLocation
 Installers:
   - Architecture: x64
     InstallerUrl: $InstallerUrl
