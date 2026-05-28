@@ -3,6 +3,7 @@ import ctypes
 import shutil
 import subprocess
 import sys
+import winreg
 
 from src.lib.system import APP_FOLDER_NAME, compatibility_installation_paths, path as default_install_root
 from src.lib.windows_shortcuts import remove_windows_shortcuts
@@ -91,14 +92,30 @@ def _remove_windows_integrations():
 		)
 	)
 
-	reg_path = r'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PasswordsManager'
-	script = f"if (Test-Path '{reg_path}') {{ Remove-Item -Path '{reg_path}' -Recurse -Force }}"
-	subprocess.run(
-		['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
-		capture_output=True,
-		text=True,
-		check=False,
-	)
+	_delete_windows_uninstall_registry_key()
+
+
+def _delete_windows_registry_tree(root, subkey):
+	try:
+		with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+			children = []
+			index = 0
+			while True:
+				try:
+					children.append(winreg.EnumKey(key, index))
+					index += 1
+				except OSError:
+					break
+		for child in children:
+			_delete_windows_registry_tree(root, f'{subkey}\\{child}')
+		winreg.DeleteKey(root, subkey)
+	except FileNotFoundError:
+		return
+
+
+def _delete_windows_uninstall_registry_key():
+	subkey = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\PasswordsManager'
+	_delete_windows_registry_tree(winreg.HKEY_CURRENT_USER, subkey)
 
 
 def _remove_linux_integrations():
