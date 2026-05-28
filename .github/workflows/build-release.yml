@@ -1,510 +1,514 @@
 name: Build, Package, Publish, and Refresh Assets
 
 on:
-    push:
-        branches:
-            - main
-            - develop
-    workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
 
 concurrency:
-    group: passwords-manager-${{ github.ref }}
-    cancel-in-progress: true
+  group: passwords-manager-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-    contents: write
-    actions: read
+  contents: write
+  actions: read
 
 env:
-    APP_NAME: Passwords Manager
-    WINGET_REPOSITORY: JLBBARCO/winget-pkbs
-    HOMEBREW_TAP_REPOSITORY: JLBBARCO/homebrew-tap
+  APP_NAME: Passwords Manager
+  WINGET_REPOSITORY: JLBBARCO/winget-pkbs
+  HOMEBREW_TAP_REPOSITORY: JLBBARCO/homebrew-tap
 
 jobs:
-    prepare-release-context:
-        if: github.actor != 'github-actions[bot]'
-        runs-on: ubuntu-latest
-        outputs:
-            version: ${{ steps.release_context.outputs.version }}
-            release_tag: ${{ steps.release_context.outputs.release_tag }}
-            release_latest: ${{ steps.release_context.outputs.release_latest }}
-            release_prerelease: ${{ steps.release_context.outputs.release_prerelease }}
-            release_channel: ${{ steps.release_context.outputs.release_channel }}
-            release_download_base: ${{ steps.release_context.outputs.release_download_base }}
-        steps:
-            - name: Resolve release context
-              id: release_context
-              shell: bash
-              run: |
-                  if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-                    VERSION="1.0.${GITHUB_RUN_NUMBER}"
-                    RELEASE_TAG="v${VERSION}"
-                    RELEASE_LATEST="true"
-                    RELEASE_PRERELEASE="false"
-                    RELEASE_CHANNEL="latest"
-                  elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
-                    VERSION="1.0.${GITHUB_RUN_NUMBER}-beta.${GITHUB_RUN_NUMBER}"
-                    RELEASE_TAG="v${VERSION}"
-                    RELEASE_LATEST="false"
-                    RELEASE_PRERELEASE="true"
-                    RELEASE_CHANNEL="pre-release"
-                  else
-                    echo "Unsupported branch: ${GITHUB_REF}" >&2
-                    exit 1
-                  fi
+  prepare-release-context:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release_context.outputs.version }}
+      release_tag: ${{ steps.release_context.outputs.release_tag }}
+      release_latest: ${{ steps.release_context.outputs.release_latest }}
+      release_prerelease: ${{ steps.release_context.outputs.release_prerelease }}
+      release_channel: ${{ steps.release_context.outputs.release_channel }}
+      release_download_base: ${{ steps.release_context.outputs.release_download_base }}
+    steps:
+      - name: Resolve release context
+        id: release_context
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            VERSION="1.0.${GITHUB_RUN_NUMBER}"
+            RELEASE_TAG="v${VERSION}"
+            RELEASE_LATEST="true"
+            RELEASE_PRERELEASE="false"
+            RELEASE_CHANNEL="latest"
+          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            VERSION="1.0.${GITHUB_RUN_NUMBER}-beta.${GITHUB_RUN_NUMBER}"
+            RELEASE_TAG="v${VERSION}"
+            RELEASE_LATEST="false"
+            RELEASE_PRERELEASE="true"
+            RELEASE_CHANNEL="pre-release"
+          else
+            echo "Unsupported branch: ${GITHUB_REF}" >&2
+            exit 1
+          fi
 
-                  echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-                  echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
-                  echo "release_latest=${RELEASE_LATEST}" >> "${GITHUB_OUTPUT}"
-                  echo "release_prerelease=${RELEASE_PRERELEASE}" >> "${GITHUB_OUTPUT}"
-                  echo "release_channel=${RELEASE_CHANNEL}" >> "${GITHUB_OUTPUT}"
-                  echo "release_download_base=https://github.com/JLBBARCO/passwords-manager/releases/download/${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "release_latest=${RELEASE_LATEST}" >> "${GITHUB_OUTPUT}"
+          echo "release_prerelease=${RELEASE_PRERELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "release_channel=${RELEASE_CHANNEL}" >> "${GITHUB_OUTPUT}"
+          echo "release_download_base=https://github.com/JLBBARCO/passwords-manager/releases/download/${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
 
-    build-windows:
-        if: github.actor != 'github-actions[bot]'
-        needs: [prepare-release-context]
-        runs-on: windows-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  build-windows:
+    if: github.actor != 'github-actions[bot]'
+    needs: [prepare-release-context]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-            - name: Install build dependencies
-              shell: pwsh
-              run: |
-                  python -m pip install --upgrade pip
-                  python -m pip install -r requirements.txt pyinstaller
-                  choco install innosetup -y --no-progress
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+          choco install innosetup -y --no-progress
 
-            - name: Build Windows binaries
-              shell: pwsh
-              env:
-                  PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-                  New-Item -ItemType Directory -Force -Path windows-package | Out-Null
-                  python -m PyInstaller --noconfirm --onefile --windowed --name passwords-manager main.py
-                  python -m PyInstaller --noconfirm --onefile --windowed --name install-passwords-manager install.py
-                  Copy-Item "dist\passwords-manager.exe" "release-assets\passwords-manager-windows.exe"
-                  Copy-Item "dist\install-passwords-manager.exe" "release-assets\install-passwords-manager.exe"
-                  Copy-Item "dist\passwords-manager.exe" "windows-package\passwords-manager.exe"
-                  Copy-Item "dist\install-passwords-manager.exe" "windows-package\install-passwords-manager.exe"
-                  Copy-Item "README.md" "windows-package\README.md"
-                  Copy-Item "LICENSE" "windows-package\LICENSE"
-                  if (Test-Path "ENCRYPTION.md") {
-                    Copy-Item "ENCRYPTION.md" "windows-package\ENCRYPTION.md"
-                  }
-                  elseif (Test-Path "CRIPTOGRAFIA.md") {
-                    Copy-Item "CRIPTOGRAFIA.md" "windows-package\ENCRYPTION.md"
-                  }
-                  Compress-Archive -Path "windows-package\*" -DestinationPath "release-assets\passwords-manager-windows.zip" -Force
+      - name: Build Windows binaries
+        shell: pwsh
+        env:
+          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          New-Item -ItemType Directory -Force -Path windows-package | Out-Null
+          python -m PyInstaller --noconfirm --onefile --windowed --name passwords-manager main.py
+          python -m PyInstaller --noconfirm --onefile --windowed --name install-passwords-manager install.py
+          Copy-Item "dist\passwords-manager.exe" "release-assets\passwords-manager-windows.exe"
+          Copy-Item "dist\install-passwords-manager.exe" "release-assets\install-passwords-manager.exe"
+          Copy-Item "dist\passwords-manager.exe" "windows-package\passwords-manager.exe"
+          Copy-Item "dist\install-passwords-manager.exe" "windows-package\install-passwords-manager.exe"
+          Copy-Item "README.md" "windows-package\README.md"
+          Copy-Item "LICENSE" "windows-package\LICENSE"
+          if (Test-Path "ENCRYPTION.md") {
+            Copy-Item "ENCRYPTION.md" "windows-package\ENCRYPTION.md"
+          }
+          elseif (Test-Path "CRIPTOGRAFIA.md") {
+            Copy-Item "CRIPTOGRAFIA.md" "windows-package\ENCRYPTION.md"
+          }
+          Compress-Archive -Path "windows-package\*" -DestinationPath "release-assets\passwords-manager-windows.zip" -Force
 
-            - name: Package Windows installer with Inno Setup
-              shell: pwsh
-              env:
-                  PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  iscc /Qp /DAppVersion="$env:PASSWORDS_MANAGER_VERSION" packaging/windows/passwords-manager.iss
-                  $installer = Get-ChildItem -Path . -Filter passwords-manager-windows-installer.exe -Recurse | Select-Object -First 1
-                  if (-not $installer) {
-                    throw "Windows installer not found after Inno Setup build."
-                  }
-                  Copy-Item $installer.FullName "release-assets\passwords-manager-windows-installer.exe"
+      - name: Package Windows installer with Inno Setup
+        shell: pwsh
+        env:
+          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          iscc /Qp /DAppVersion="$env:PASSWORDS_MANAGER_VERSION" packaging/windows/passwords-manager.iss
+          $installer = Get-ChildItem -Path . -Filter passwords-manager-windows-installer.exe -Recurse | Select-Object -First 1
+          if (-not $installer) {
+            throw "Windows installer not found after Inno Setup build."
+          }
+          Copy-Item $installer.FullName "release-assets\passwords-manager-windows-installer.exe"
 
-            - name: Capture Windows screenshot
-              shell: pwsh
-              run: |
-                  python scripts/capture_release_screenshot.py --executable "release-assets\passwords-manager-windows.exe" --output "release-assets\windows.webp" --os windows
+      - name: Capture Windows screenshot
+        shell: pwsh
+        run: |
+          python scripts/capture_release_screenshot.py --executable "release-assets\passwords-manager-windows.exe" --output "release-assets\windows.webp" --os windows
 
-            - name: Upload Windows artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: windows-release-assets
-                  path: |
-                      release-assets/passwords-manager-windows.exe
-                      release-assets/install-passwords-manager.exe
-                      release-assets/passwords-manager-windows-installer.exe
-                      release-assets/passwords-manager-windows.zip
-                      release-assets/windows.webp
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-assets
+          path: |
+            release-assets/passwords-manager-windows.exe
+            release-assets/install-passwords-manager.exe
+            release-assets/passwords-manager-windows-installer.exe
+            release-assets/passwords-manager-windows.zip
+            release-assets/windows.webp
 
-    build-macos:
-        if: github.actor != 'github-actions[bot]'
-        needs: [prepare-release-context]
-        runs-on: macos-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  build-macos:
+    if: github.actor != 'github-actions[bot]'
+    needs: [prepare-release-context]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-            - name: Install build dependencies
-              shell: bash
-              run: |
-                  python -m pip install --upgrade pip
-                  python -m pip install -r requirements.txt pyinstaller
-                  brew update
-                  brew install create-dmg
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+          brew update
+          brew install create-dmg
 
-            - name: Build macOS binaries
-              shell: bash
-              env:
-                  PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  mkdir -p release-assets
-                  python -m PyInstaller --noconfirm --onefile --name passwords-manager main.py
-                  python -m PyInstaller --noconfirm --windowed --name "Passwords Manager" main.py
-                  cp dist/passwords-manager release-assets/passwords-manager
-                  tar -czf release-assets/passwords-manager-macos.tar.gz -C dist passwords-manager
+      - name: Build macOS binaries
+        shell: bash
+        env:
+          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          mkdir -p release-assets
+          python -m PyInstaller --noconfirm --onefile --name passwords-manager main.py
+          python -m PyInstaller --noconfirm --windowed --name "Passwords Manager" main.py
+          cp dist/passwords-manager release-assets/passwords-manager
+          tar -czf release-assets/passwords-manager-macos.tar.gz -C dist passwords-manager
 
-            - name: Package macOS disk image
-              shell: bash
-              run: |
-                  rm -f release-assets/passwords-manager-macos.dmg
-                  create-dmg \
-                    --volname "Passwords Manager" \
-                    --window-size 540 380 \
-                    --icon-size 128 \
-                    --app-drop-link 380 190 \
-                    "release-assets/passwords-manager-macos.dmg" \
-                    "dist/Passwords Manager.app"
+      - name: Package macOS disk image
+        shell: bash
+        run: |
+          rm -f release-assets/passwords-manager-macos.dmg
+          create-dmg \
+            --volname "Passwords Manager" \
+            --window-size 540 380 \
+            --icon-size 128 \
+            --app-drop-link 380 190 \
+            "release-assets/passwords-manager-macos.dmg" \
+            "dist/Passwords Manager.app"
 
-            - name: Capture macOS screenshot
-              shell: bash
-              run: |
-                  python scripts/capture_release_screenshot.py --executable "dist/Passwords Manager.app/Contents/MacOS/Passwords Manager" --output "release-assets/macos.webp" --os macos
+      - name: Capture macOS screenshot
+        shell: bash
+        run: |
+          python scripts/capture_release_screenshot.py --executable "dist/Passwords Manager.app/Contents/MacOS/Passwords Manager" --output "release-assets/macos.webp" --os macos
 
-            - name: Upload macOS artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: macos-release-assets
-                  path: |
-                      release-assets/passwords-manager-macos.tar.gz
-                      release-assets/passwords-manager-macos.dmg
-                      release-assets/macos.webp
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release-assets
+          path: |
+            release-assets/passwords-manager-macos.tar.gz
+            release-assets/passwords-manager-macos.dmg
+            release-assets/macos.webp
 
-    build-linux:
-        if: github.actor != 'github-actions[bot]'
-        needs: [prepare-release-context]
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  build-linux:
+    if: github.actor != 'github-actions[bot]'
+    needs: [prepare-release-context]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-            - name: Install build dependencies
-              shell: bash
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y fuse libfuse2 desktop-file-utils patchelf xvfb
-                  python -m pip install --upgrade pip
-                  python -m pip install -r requirements.txt pyinstaller
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fuse libfuse2 desktop-file-utils patchelf xvfb
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
 
-            - name: Build Linux binary
-              shell: bash
-              env:
-                  PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  mkdir -p release-assets/AppDir/usr/bin release-assets/AppDir/usr/share/applications release-assets/AppDir/usr/share/icons/hicolor/256x256/apps
-                  python -m PyInstaller --noconfirm --onefile --name passwords-manager main.py
-                  cp dist/passwords-manager release-assets/passwords-manager
-                  tar -czf release-assets/passwords-manager-linux.tar.gz -C dist passwords-manager
-                  cp dist/passwords-manager release-assets/AppDir/usr/bin/passwords-manager
-                  chmod +x release-assets/AppDir/usr/bin/passwords-manager
-                  python -c "from PIL import Image; Image.open('src/assets/icon/passwords-manager.ico').save('release-assets/AppDir/usr/share/icons/hicolor/256x256/apps/passwords-manager.png')"
-                  cat > release-assets/AppDir/passwords-manager.desktop <<'EOF'
-                  [Desktop Entry]
-                  Type=Application
-                  Name=Passwords Manager
-                  Exec=passwords-manager
-                  Icon=passwords-manager
-                  Categories=Utility;Security;
-                  Terminal=false
-                  EOF
-                  cp release-assets/AppDir/passwords-manager.desktop release-assets/AppDir/usr/share/applications/passwords-manager.desktop
-                  cat > release-assets/AppDir/AppRun <<'EOF'
-                  #!/bin/sh
-                  HERE="$(dirname "$(readlink -f "$0")")"
-                  exec "$HERE/usr/bin/passwords-manager" "$@"
-                  EOF
+      - name: Build Linux binary
+        shell: bash
+        env:
+          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          mkdir -p release-assets/AppDir/usr/bin release-assets/AppDir/usr/share/applications release-assets/AppDir/usr/share/icons/hicolor/256x256/apps
+          python -m PyInstaller --noconfirm --onefile --name passwords-manager main.py
+          cp dist/passwords-manager release-assets/passwords-manager
+          tar -czf release-assets/passwords-manager-linux.tar.gz -C dist passwords-manager
+          cp dist/passwords-manager release-assets/AppDir/usr/bin/passwords-manager
+          chmod +x release-assets/AppDir/usr/bin/passwords-manager
+          python -c "from PIL import Image; Image.open('src/assets/icon/passwords-manager.ico').save('release-assets/AppDir/usr/share/icons/hicolor/256x256/apps/passwords-manager.png')"
+          cat > release-assets/AppDir/passwords-manager.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Passwords Manager
+          Exec=passwords-manager
+          Icon=passwords-manager
+          Categories=Utility;Security;
+          Terminal=false
+          EOF
+          cp release-assets/AppDir/passwords-manager.desktop release-assets/AppDir/usr/share/applications/passwords-manager.desktop
+          cat > release-assets/AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/passwords-manager" "$@"
+          EOF
 
-            - name: Upload Linux artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: linux-release-assets
-                  path: |
-                      release-assets/passwords-manager-linux.tar.gz
-                      release-assets/passwords-manager-linux.AppImage
-                      release-assets/linux.webp
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-assets
+          path: |
+            release-assets/passwords-manager-linux.tar.gz
+            release-assets/passwords-manager-linux.AppImage
+            release-assets/linux.webp
 
-    create-release:
-        if: github.actor != 'github-actions[bot]'
-        needs:
-            - prepare-release-context
-            - build-windows
-            - build-macos
-            - build-linux
-        runs-on: ubuntu-latest
-        outputs:
-            release_tag: ${{ steps.release.outputs.release_tag }}
-            release_url: ${{ steps.release.outputs.release_url }}
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+  create-release:
+    if: github.actor != 'github-actions[bot]'
+    needs:
+      - prepare-release-context
+      - build-windows
+      - build-macos
+      - build-linux
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      release_url: ${{ steps.release.outputs.release_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-            - name: Download all artifacts
-              uses: actions/download-artifact@v4
-              with:
-                  pattern: "*-release-assets"
-                  path: release-assets
-                  merge-multiple: true
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-release-assets"
+          path: release-assets
+          merge-multiple: true
 
-            - name: Assemble release package
-              shell: bash
-              run: |
-                  mkdir -p release-package
-                  find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release-package/ \;
-                  sha256sum release-package/* > release-package/SHA256SUMS.txt
-                  cat release-package/SHA256SUMS.txt
+      - name: Assemble release package
+        shell: bash
+        run: |
+          mkdir -p release-package
+          find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release-package/ \;
+          sha256sum release-package/* > release-package/SHA256SUMS.txt
+          cat release-package/SHA256SUMS.txt
 
-            - name: Upload packaged release artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: release-package
-                  path: release-package/*
+      - name: Upload packaged release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: release-package/*
 
-            - name: Create git tag
-              shell: bash
-              env:
-                  RELEASE_TAG: ${{ needs.prepare-release-context.outputs.release_tag }}
-              run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  if git rev-parse "${RELEASE_TAG}" >/dev/null 2>&1; then
-                    git tag -d "${RELEASE_TAG}" || true
-                  fi
-                  git tag "${RELEASE_TAG}" "${GITHUB_SHA}"
-                  git push origin "${RELEASE_TAG}"
+      - name: Create git tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.prepare-release-context.outputs.release_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "${RELEASE_TAG}" >/dev/null 2>&1; then
+            git tag -d "${RELEASE_TAG}" || true
+          fi
+          git tag "${RELEASE_TAG}" "${GITHUB_SHA}"
+          git push origin "${RELEASE_TAG}"
 
-            - name: Create GitHub release
-              id: release
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  RELEASE_TAG: ${{ needs.prepare-release-context.outputs.release_tag }}
-                  RELEASE_LATEST: ${{ needs.prepare-release-context.outputs.release_latest }}
-                  RELEASE_PRERELEASE: ${{ needs.prepare-release-context.outputs.release_prerelease }}
-                  RELEASE_CHANNEL: ${{ needs.prepare-release-context.outputs.release_channel }}
-              run: |
-                  cat > release-notes.md <<EOF
-                  Passwords Manager ${RELEASE_TAG}
+      - name: Create GitHub release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare-release-context.outputs.release_tag }}
+          RELEASE_LATEST: ${{ needs.prepare-release-context.outputs.release_latest }}
+          RELEASE_PRERELEASE: ${{ needs.prepare-release-context.outputs.release_prerelease }}
+          RELEASE_CHANNEL: ${{ needs.prepare-release-context.outputs.release_channel }}
+        run: |
+          cat > release-notes.md <<EOF
+          Passwords Manager ${RELEASE_TAG}
 
-                  Channel: ${RELEASE_CHANNEL}
+          Channel: ${RELEASE_CHANNEL}
 
-                  This release includes installers, portable archives, and SHA-256 hashes for all packaged files.
-                  EOF
+          This release includes installers, portable archives, and SHA-256 hashes for all packaged files.
+          EOF
 
-                  RELEASE_ARGS=("${RELEASE_TAG}" --title "Passwords Manager ${RELEASE_TAG}" --notes-file release-notes.md)
-                  if [[ "${RELEASE_LATEST}" == "true" ]]; then
-                    RELEASE_ARGS+=(--latest)
-                  fi
-                  if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
-                    RELEASE_ARGS+=(--prerelease)
-                  fi
+          RELEASE_ARGS=("${RELEASE_TAG}" --title "Passwords Manager ${RELEASE_TAG}" --notes-file release-notes.md)
+          if [[ "${RELEASE_LATEST}" == "true" ]]; then
+            RELEASE_ARGS+=(--latest)
+          fi
+          if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
+            RELEASE_ARGS+=(--prerelease)
+          fi
 
-                  gh release create "${RELEASE_ARGS[@]}" release-package/*
-                  echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
-                  echo "release_url=https://github.com/JLBBARCO/passwords-manager/releases/tag/${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          gh release create "${RELEASE_ARGS[@]}" release-package/*
+          echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "release_url=https://github.com/JLBBARCO/passwords-manager/releases/tag/${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
 
-    publish-winget:
-        if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
-        needs: [prepare-release-context, create-release]
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  publish-winget:
+    if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
+    needs: [prepare-release-context, create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Verify Winget token
-              shell: bash
-              env:
-                  WINGET_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
-              run: |
-                  if [[ -z "${WINGET_TOKEN}" ]]; then
-                    echo "WINGET_PKGS_TOKEN secret is required to publish to ${WINGET_REPOSITORY}." >&2
-                    exit 1
-                  fi
+      - name: Verify Winget token
+        shell: bash
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+        run: |
+          if [[ -z "${WINGET_TOKEN}" ]]; then
+            echo "WINGET_PKGS_TOKEN secret is required to publish to ${WINGET_REPOSITORY}." >&2
+            exit 1
+          fi
 
-            - name: Download release package
-              uses: actions/download-artifact@v4
-              with:
-                  name: release-package
-                  path: release-package
+      - name: Download release package
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package
+          path: release-package
 
-            - name: Generate Winget manifests
-              shell: pwsh
-              env:
-                  VERSION: ${{ needs.prepare-release-context.outputs.version }}
-                  RELEASE_TAG: ${{ needs.prepare-release-context.outputs.release_tag }}
-              run: |
-                  ./scripts/generate-winget-manifest.ps1 -Version $env:VERSION -ReleaseTag $env:RELEASE_TAG
+      - name: Generate Winget manifests
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare-release-context.outputs.version }}
+          RELEASE_TAG: ${{ needs.prepare-release-context.outputs.release_tag }}
+        run: |
+          ./scripts/generate-winget-manifest.ps1 -Version $env:VERSION -ReleaseTag $env:RELEASE_TAG
 
-            - name: Clone winget fork
-              shell: bash
-              env:
-                  WINGET_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
-              run: |
-                  rm -rf winget-pkgs
-                  git clone "https://x-access-token:${WINGET_TOKEN}@github.com/${WINGET_REPOSITORY}.git" winget-pkgs
+      - name: Clone winget fork
+        shell: bash
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+        run: |
+          rm -rf winget-pkgs
+          git clone "https://x-access-token:${WINGET_TOKEN}@github.com/${WINGET_REPOSITORY}.git" winget-pkgs
 
-            - name: Publish Winget manifests
-              shell: bash
-              env:
-                  VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  DEST_DIR="winget-pkgs/manifests/j/JLBBARCO/PasswordsManager/${VERSION}"
-                  mkdir -p "${DEST_DIR}"
-                  cp packaging/winget/${VERSION}/*.yaml "${DEST_DIR}/"
-                  git -C winget-pkgs config user.name "github-actions[bot]"
-                  git -C winget-pkgs config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git -C winget-pkgs add "${DEST_DIR}"
-                  if git -C winget-pkgs diff --cached --quiet; then
-                    echo "No Winget changes to publish."
-                    exit 0
-                  fi
-                  git -C winget-pkgs commit -m "Publish Passwords Manager ${VERSION}"
-                  git -C winget-pkgs push
+      - name: Publish Winget manifests
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          DEST_DIR="winget-pkgs/manifests/j/JLBBARCO/PasswordsManager/${VERSION}"
+          mkdir -p "${DEST_DIR}"
+          cp packaging/winget/${VERSION}/*.yaml "${DEST_DIR}/"
+          git -C winget-pkgs config user.name "github-actions[bot]"
+          git -C winget-pkgs config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C winget-pkgs add "${DEST_DIR}"
+          if git -C winget-pkgs diff --cached --quiet; then
+            echo "No Winget changes to publish."
+            exit 0
+          fi
+          git -C winget-pkgs commit -m "Publish Passwords Manager ${VERSION}"
+          git -C winget-pkgs push
 
-    publish-homebrew:
-        if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
-        needs: [prepare-release-context, create-release]
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  publish-homebrew:
+    if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
+    needs: [prepare-release-context, create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Verify Homebrew token
-              shell: bash
-              env:
-                  HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-              run: |
-                  if [[ -z "${HOMEBREW_TOKEN}" ]]; then
-                    echo "HOMEBREW_TAP_TOKEN secret is required to publish to ${HOMEBREW_TAP_REPOSITORY}." >&2
-                    exit 1
-                  fi
+      - name: Verify Homebrew token
+        shell: bash
+        env:
+          HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [[ -z "${HOMEBREW_TOKEN}" ]]; then
+            echo "HOMEBREW_TAP_TOKEN secret is required to publish to ${HOMEBREW_TAP_REPOSITORY}." >&2
+            exit 1
+          fi
 
-            - name: Download release package
-              uses: actions/download-artifact@v4
-              with:
-                  name: release-package
-                  path: release-package
+      - name: Download release package
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package
+          path: release-package
 
-            - name: Clone Homebrew tap
-              shell: bash
-              env:
-                  HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-              run: |
-                  rm -rf homebrew-tap
-                  git clone "https://x-access-token:${HOMEBREW_TOKEN}@github.com/${HOMEBREW_TAP_REPOSITORY}.git" homebrew-tap
+      - name: Clone Homebrew tap
+        shell: bash
+        env:
+          HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          rm -rf homebrew-tap
+          git clone "https://x-access-token:${HOMEBREW_TOKEN}@github.com/${HOMEBREW_TAP_REPOSITORY}.git" homebrew-tap
 
-            - name: Render Homebrew formula
-              shell: bash
-              env:
-                  VERSION: ${{ needs.prepare-release-context.outputs.version }}
-                  RELEASE_DOWNLOAD_BASE: ${{ needs.prepare-release-context.outputs.release_download_base }}
-              run: |
-                  if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
-                    FORMULA_FILE="passwords-manager-beta.rb"
-                    FORMULA_CLASS="PasswordsManagerBeta"
-                  else
-                    FORMULA_FILE="passwords-manager.rb"
-                    FORMULA_CLASS="PasswordsManager"
-                  fi
+      - name: Render Homebrew formula
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare-release-context.outputs.version }}
+          RELEASE_DOWNLOAD_BASE: ${{ needs.prepare-release-context.outputs.release_download_base }}
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            FORMULA_FILE="passwords-manager-beta.rb"
+            FORMULA_CLASS="PasswordsManagerBeta"
+          else
+            FORMULA_FILE="passwords-manager.rb"
+            FORMULA_CLASS="PasswordsManager"
+          fi
 
-                  MAC_SHA=$(grep 'passwords-manager-macos.tar.gz' release-package/SHA256SUMS.txt | awk '{print $1}')
-                  LINUX_SHA=$(grep 'passwords-manager-linux.tar.gz' release-package/SHA256SUMS.txt | awk '{print $1}')
+          MAC_SHA=$(grep 'passwords-manager-macos.tar.gz' release-package/SHA256SUMS.txt | awk '{print $1}')
+          LINUX_SHA=$(grep 'passwords-manager-linux.tar.gz' release-package/SHA256SUMS.txt | awk '{print $1}')
 
-                  cat > "homebrew-tap/Formula/${FORMULA_FILE}" <<EOF
-                  class ${FORMULA_CLASS} < Formula
-                    desc "Password manager with encrypted local storage"
-                    homepage "https://github.com/JLBBARCO/passwords-manager"
-                    version "${VERSION}"
+          cat > "homebrew-tap/Formula/${FORMULA_FILE}" <<EOF
+          class ${FORMULA_CLASS} < Formula
+            desc "Password manager with encrypted local storage"
+            homepage "https://github.com/JLBBARCO/passwords-manager"
+            version "${VERSION}"
 
-                    on_macos do
-                      url "${RELEASE_DOWNLOAD_BASE}/passwords-manager-macos.tar.gz"
-                      sha256 "${MAC_SHA}"
-                    end
+            on_macos do
+              url "${RELEASE_DOWNLOAD_BASE}/passwords-manager-macos.tar.gz"
+              sha256 "${MAC_SHA}"
+            end
 
-                    on_linux do
-                      url "${RELEASE_DOWNLOAD_BASE}/passwords-manager-linux.tar.gz"
-                      sha256 "${LINUX_SHA}"
-                    end
+            on_linux do
+              url "${RELEASE_DOWNLOAD_BASE}/passwords-manager-linux.tar.gz"
+              sha256 "${LINUX_SHA}"
+            end
 
-                    def install
-                      bin.install "passwords-manager"
-                    end
-                  end
-                  EOF
+            def install
+              bin.install "passwords-manager"
+            end
+          end
+          EOF
 
-            - name: Publish Homebrew formula
-              shell: bash
-              env:
-                  VERSION: ${{ needs.prepare-release-context.outputs.version }}
-              run: |
-                  git -C homebrew-tap config user.name "github-actions[bot]"
-                  git -C homebrew-tap config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git -C homebrew-tap add Formula/*.rb
-                  if git -C homebrew-tap diff --cached --quiet; then
-                    echo "No Homebrew changes to publish."
-                    exit 0
-                  fi
-                  git -C homebrew-tap commit -m "Publish Passwords Manager ${VERSION}"
-                  git -C homebrew-tap push
+      - name: Publish Homebrew formula
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          git -C homebrew-tap config user.name "github-actions[bot]"
+          git -C homebrew-tap config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C homebrew-tap add Formula/*.rb
+          if git -C homebrew-tap diff --cached --quiet; then
+            echo "No Homebrew changes to publish."
+            exit 0
+          fi
+          git -C homebrew-tap commit -m "Publish Passwords Manager ${VERSION}"
+          git -C homebrew-tap push
 
-    refresh-screenshots:
-        if: github.actor != 'github-actions[bot]'
-        needs: [build-windows, build-macos, build-linux]
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  refresh-screenshots:
+    if: github.actor != 'github-actions[bot]'
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Download screenshot artifacts
-              uses: actions/download-artifact@v4
-              with:
-                  pattern: "*-release-assets"
-                  path: release-assets
-                  merge-multiple: true
+      - name: Download screenshot artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-release-assets"
+          path: release-assets
+          merge-multiple: true
 
-            - name: Refresh tracked screenshots
-              shell: bash
-              run: |
-                  mkdir -p src/assets/screenshot src/assets/img
-                  cp release-assets/windows.webp src/assets/screenshot/windows.webp
-                  cp release-assets/macos.webp src/assets/screenshot/macos.webp
-                  cp release-assets/linux.webp src/assets/screenshot/linux.webp
-                  python scripts/generate_screenshots.py --compose-thumbnail --output src/assets/img/thumbnail.webp --inputs src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp
+      - name: Refresh tracked screenshots
+        shell: bash
+        run: |
+          mkdir -p src/assets/screenshot src/assets/img
+          for f in windows macos linux; do
+            if [ -f "release-assets/${f}.webp" ]; then
+              cp "release-assets/${f}.webp" "src/assets/screenshot/${f}.webp"
+            else
+              echo "warning: release-assets/${f}.webp not found, skipping"
+            fi
+          done
+          python scripts/generate_screenshots.py --compose-thumbnail --output src/assets/img/thumbnail.webp --inputs src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp
 
-            - name: Commit screenshot refresh
-              shell: bash
-              run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git add src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp src/assets/img/thumbnail.webp
-                  if git diff --cached --quiet; then
-                    echo "No screenshot updates to commit."
-                    exit 0
-                  fi
-                  git commit -m "chore: refresh release screenshots"
-                  git push
+      - name: Commit screenshot refresh
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp src/assets/img/thumbnail.webp
+          if git diff --cached --quiet; then
+            echo "No screenshot updates to commit."
+            exit 0
+          fi
+          git commit -m "chore: refresh release screenshots"
+          git push
