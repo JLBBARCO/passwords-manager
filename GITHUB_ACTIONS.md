@@ -1,286 +1,51 @@
 # GitHub Actions - Automatic Build and Release
 
-## 📋 Overview
+## Overview
 
-This repository has automated GitHub Actions workflows that compile Password Manager for Windows, Linux, and macOS, package files, and automatically publish to Releases.
-It also includes an Android APK workflow with readiness checks.
+This repository uses a single GitHub Actions workflow, [build-release.yml](.github/workflows/build-release.yml), to build Passwords Manager on Windows, macOS, and Linux.
 
-## 🔄 When the Workflow is Executed
+The workflow:
 
-The workflow is triggered in the following situations:
+1. Builds each platform on `main` and `develop`
+2. Packages the platform-specific installers
+3. Creates a GitHub Release
+4. Computes SHA-256 hashes for the release assets
+5. Publishes to WinGet and Homebrew
+6. Refreshes the screenshot assets and commits them back to the repository
 
-1. **Push to `main` branch**: Automatic version tag creation (`vX.Y.Z`) and package publication flow
-2. **Push to `criptograph` branch**: Development build
-3. **Tag creation**: Versioned releases (example: `v1.0.0`, `v2.1.3`)
-4. **Manual execution**: Via GitHub Actions interface
+## Branch Behavior
 
-## 🏗️ Build Process
+- `main` creates a latest release
+- `develop` creates a pre-release
 
-### Windows Build
+## Outputs
 
-1. **Environment**: `windows-latest`
-2. **Python**: 3.11
-3. **Process**:
-   - Installs dependencies from `requirements.txt`
-   - Installs PyInstaller
-   - Compiles `main.py`, `uninstall.py` and `install.py` with PyInstaller (--onefile --noconsole)
-   - Includes application icon
-   - Creates release structure with `release/uninstall/uninstall.exe`
-   - Creates installer package with `install-passwords-manager.exe`
-   - Compresses to ZIP file
-   - Publishes to release
+- Windows: `passwords-manager-windows-installer.exe`, `install-passwords-manager.exe`, and `passwords-manager-windows.zip`
+- macOS: `passwords-manager-macos.dmg` and `passwords-manager-macos.tar.gz`
+- Linux: `passwords-manager-linux.AppImage` and `passwords-manager-linux.tar.gz`
+- Hash file: `SHA256SUMS.txt`
 
-### Linux Build
+## Publication Targets
 
-1. **Environment**: `ubuntu-latest`
-2. **Python**: 3.11
-3. **Process**:
-   - Installs dependencies from `requirements.txt`
-   - Installs PyInstaller
-   - Compiles with PyInstaller (--onefile --noconsole)
-   - Creates release structure with README, LICENSE and ENCRYPTION.md
-   - Sets execution permissions
-   - Compresses to TAR.GZ file
-   - Publishes to release
+- WinGet uses the `JLBBARCO/winget-pkbs` fork
+- Homebrew uses the `JLBBARCO/homebrew-tap` repository
 
-### macOS Build
+## Required Secrets
 
-1. **Environment**: `macos-latest`
-2. **Python**: 3.11
-3. **Process**:
-   - Installs dependencies from `requirements.txt`
-   - Installs PyInstaller
-   - Compiles with PyInstaller (--onefile --windowed)
-   - Creates release structure with README, LICENSE and ENCRYPTION.md
-   - Sets execution permissions
-   - Compresses to TAR.GZ file
-   - Publishes to release
+- `WINGET_TOKEN`
+- `HOMEBREW_TAP_TOKEN`
 
-### Android APK Workflow
+## Local Installation
 
-1. **Environment**: `ubuntu-latest`
-2. **Build Tool**: Buildozer (`buildozer android debug`)
-3. **Safety checks before build**:
-   - Requires `buildozer.spec` in repository root
-   - Requires `android/main.py` as Android entry point
-   - Validates `source.dir = android` in `buildozer.spec`
-4. **Output**:
-   - APK artifact upload
-   - APK attachment to release when release trigger is used
-
-## 📦 Generated Files
-
-### Windows
-
-- **File**: `passwords-manager-windows.zip`
-- **Installer**: `install-passwords-manager.exe`
-- **Content main executable**: `passwords-manager.exe`
-- **Content uninstaller**: `uninstall/uninstall.exe`
-- **Content docs**: `README.md`, `LICENSE`, `ENCRYPTION.md`
-
-### Linux
-
-- **File**: `passwords-manager-linux.tar.gz`
-- **Content**:
-  - `passwords-manager` - Main executable (with execution permission)
-  - `README.md` - Documentation
-  - `LICENSE` - License
-  - `ENCRYPTION.md` - Encryption technical documentation
-
-### macOS
-
-- **File**: `passwords-manager-macos.tar.gz`
-- **Content**:
-  - `passwords-manager` - Main executable (with execution permission)
-  - `README.md` - Documentation
-  - `LICENSE` - License
-  - `ENCRYPTION.md` - Encryption technical documentation
-
-## 🏷️ Release System
-
-### Versioned Releases
-
-When a commit reaches `main`, the workflow now:
-
-1. Finds the latest `v*` tag
-2. Creates the next patch tag automatically (example: `v1.4.7` -> `v1.4.8`)
-3. Pushes the new tag
-4. Runs build + release from the tag event
-5. Publishes to Winget
-6. Updates Homebrew tap only when a tap repository is configured
-
-You can still create and push a tag manually:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-In both automatic and manual tag flows, the workflow creates:
-
-- Release with version name
-- Build for Windows, Linux and macOS
-- Compressed files attached
-- Winget publication
-- Homebrew formula update (optional, requires tap repository)
-
-## 📝 Release Information
-
-Each release automatically includes:
-
-- **Version**: Tag or "latest"
-- **Program Features**: List of functionalities
-- **Important Notices**: About encryption.key and security
-- **Changelog**: Commit information
-- **Build Metadata**:
-  - Build date and time
-  - Source branch
-  - Commit hash
-
-## 🚀 How to Use the Builds
-
-### Windows (End User)
-
-1. Download `passwords-manager-windows.zip` from release
-2. Extract the ZIP file
-3. Run `install-passwords-manager.exe`
-
-Alternative (after winget publication):
-
-```powershell
-winget install JLBBARCO.PasswordsManager
-```
-
-### Linux (End User)
-
-1. Download `passwords-manager-linux.tar.gz` from release
-2. Extract the file:
-
-   ```bash
-   tar -xzf passwords-manager-linux.tar.gz
-   ```
-
-3. Run the program:
-
-   ```bash
-   ./passwords-manager
-   ```
-
-Alternative installer script:
+The Linux and macOS release archives are still compatible with `scripts/install-unix.sh`.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/install-unix.sh | bash
 ```
 
-### macOS (End User)
+## Notes
 
-1. Download `passwords-manager-macos.tar.gz` from release
-2. Extract the file:
-
-   ```bash
-   tar -xzf passwords-manager-macos.tar.gz
-   ```
-
-3. Run the program:
-
-   ```bash
-   ./passwords-manager
-   ```
-
-Alternative installer script:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/install-unix.sh | bash
-```
-
-**Note**: On macOS, you may need to authorize the application execution in Security and Privacy settings.
-
-## 🔧 Workflow Configuration
-
-The workflow is located at: `.github/workflows/build-release.yml`
-
-Android workflow: `.github/workflows/build-android-apk.yml`
-
-### Required Permissions
-
-The workflow uses automatic `GITHUB_TOKEN` with permissions for:
-
-- Create and update releases
-- Upload assets
-- Read repository code
-
-### Optional Homebrew Tap Configuration
-
-Homebrew publish is optional. If no tap repository is configured, the workflow skips Homebrew update and continues successfully.
-
-To enable Homebrew publishing:
-
-1. Create a tap repository (example: `JLBBARCO/homebrew-tap`)
-2. In `.github/workflows/build-release.yml`, set `HOMEBREW_TAP_REPOSITORY` to your tap repo name
-3. If your tap is private or in a different scope, use a PAT with `repo` permission instead of default `github.token`
-
-### Modifying the Workflow
-
-To adjust the behavior:
-
-1. **Add more platforms**: Create new jobs (ex: `build-macos`)
-2. **Change Python version**: Modify `python-version`
-3. **Include more files**: Add to "Prepare release files"
-4. **Customize description**: Edit the release `body` section
-
-## ❗ Troubleshooting
-
-### Build Fails
-
-1. Check logs in GitHub Actions
-2. Make sure all dependencies are in `requirements.txt`
-3. Check for syntax errors in code
-
-### Release Not Updating
-
-1. Check if commit was to correct branch
-2. Confirm workflow was executed ("Actions" tab)
-3. Check `GITHUB_TOKEN` permissions
-
-### Homebrew Publish Skipped
-
-1. Confirm `HOMEBREW_TAP_REPOSITORY` is configured in workflow
-2. Confirm the tap repository exists
-3. If needed, use PAT with access to tap repository
-
-### Missing File
-
-1. Confirm file exists in repository
-2. Check "Prepare release files" step
-3. See artifacts for debugging
-
-## 📊 Monitoring
-
-To track builds:
-
-1. Go to "Actions" on GitHub
-2. Select "Build and Release" workflow
-3. View execution history
-4. Click an execution to see details and logs
-
-## 🔐 Security
-
-- **Secrets**: Workflow uses only automatic `GITHUB_TOKEN`
-- **Dependencies**: Installed via pip from official sources
-- **Build**: Executed in isolated GitHub environments
-- **Assets**: Published directly from build pipeline
-
-## 📚 References
-
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [PyInstaller Documentation](https://pyinstaller.org/)
-- [softprops/action-gh-release](https://github.com/softprops/action-gh-release)
-
-## 🤝 Contributing
-
-When contributing:
-
-1. Push to your branch
-2. Workflow creates development build for non-main branches
-3. After merge/push to `main`, a new version tag is created automatically
-4. The tag run publishes GitHub Release, Winget, and Homebrew
+- Screenshot refresh commits are made by `github-copilot[bot]`
+- Release screenshots are rendered from the app UI assets, not captured from the full desktop
+- The workflow fails fast if a required publication token is missing
+- The release assets and screenshots are updated from the same workflow run, so the repository stays in sync with the published release
