@@ -45,6 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scr
 
 ## Notes
 
-- Screenshot refresh commits are made by `github-actions[bot]`
+- Screenshot refresh commits are made by `github-copilot[bot]`
+- Release screenshots are rendered from the app UI assets, not captured from the full desktop
 - The workflow fails fast if a required publication token is missing
 - The release assets and screenshots are updated from the same workflow run, so the repository stays in sync with the published release

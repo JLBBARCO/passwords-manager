@@ -26,4 +26,5 @@ Only one release workflow remains active:
 ## Notes
 
 - The workflow refreshes `src/assets/screenshot/*.webp` and `src/assets/img/thumbnail.webp` after each successful release build.
+- Release screenshots are rendered by the workflow from the app UI, not captured from the full desktop.
 - The workflow writes SHA-256 hashes into `SHA256SUMS.txt` and uploads that file to the release.

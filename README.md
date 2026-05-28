@@ -183,7 +183,7 @@ Prefer to run from source code? See the [Installation](#installation) section ab
 
 ## 🤖 Automatic Build
 
-This project uses GitHub Actions to automatically compile the program on the `main` and `develop` branches. The workflow also creates releases, computes SHA-256 checksums, publishes package metadata, refreshes the screenshots, and commits the updated assets back to the repository.
+This project uses GitHub Actions to automatically compile the program on the `main` and `develop` branches. The workflow also creates releases, computes SHA-256 checksums, publishes package metadata, renders the screenshots from the app UI, and commits the updated assets back to the repository.
 
 ## 📚 Documentation
 
