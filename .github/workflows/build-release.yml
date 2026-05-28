@@ -116,6 +116,7 @@ jobs:
           Copy-Item $installer.FullName "release-assets\passwords-manager-windows-installer.exe"
 
       - name: Capture Windows screenshot
+        if: github.actor == 'github-copilot[bot]'
         shell: pwsh
         run: |
           python scripts/capture_release_screenshot.py --executable "release-assets\passwords-manager-windows.exe" --output "release-assets\windows.webp" --os windows
@@ -176,6 +177,7 @@ jobs:
             "dist/Passwords Manager.app"
 
       - name: Capture macOS screenshot
+        if: github.actor == 'github-copilot[bot]'
         shell: bash
         run: |
           python scripts/capture_release_screenshot.py --executable "dist/Passwords Manager.app/Contents/MacOS/Passwords Manager" --output "release-assets/macos.webp" --os macos
@@ -473,7 +475,7 @@ jobs:
           git -C homebrew-tap push
 
   refresh-screenshots:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor == 'github-copilot[bot]'
     needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     steps:
@@ -511,8 +513,8 @@ jobs:
       - name: Commit screenshot refresh
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-copilot[bot]"
+          git config user.email "github-copilot[bot]@users.noreply.github.com"
           git add src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp src/assets/img/thumbnail.webp
           if git diff --cached --quiet; then
             echo "No screenshot updates to commit."
