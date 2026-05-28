@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 APP_FOLDER_NAME = "Passwords Manager"
-WINDOWS_INSTALL_ROOT = Path("C:/File Programs")
+WINDOWS_INSTALL_ROOT = Path("C:/File Programs (x86)")
+LEGACY_WINDOWS_INSTALL_ROOT = Path("C:/File Programs")
 DATA_FILENAMES = (
     "passwords.json",
     "encryption.key",
@@ -23,9 +24,6 @@ DATA_FILE_ALIASES = {
 
 
 def nameSO():
-    if is_android():
-        return "Android"
-
     system = platform.system()
 
     if system == "Windows":
@@ -56,48 +54,11 @@ def path():
         return str(WINDOWS_INSTALL_ROOT / APP_FOLDER_NAME)
     elif name == "Linux" or name == "MacOS":
         return "/usr/local/Passwords Manager"
-    elif name == "Android":
-        return str(local_data_path())
     else:
         return "Unknown"
 
 
-def is_android():
-    if os.environ.get("ANDROID_ARGUMENT"):
-        return True
-
-    if os.environ.get("P4A_BOOTSTRAP"):
-        return True
-
-    if "android" in platform.platform().lower():
-        return True
-
-    return False
-
-
-def _android_data_path():
-    try:
-        from android.storage import app_storage_path  # type: ignore
-
-        return Path(app_storage_path()) / APP_FOLDER_NAME
-    except Exception:
-        pass
-
-    private_dir = os.environ.get("ANDROID_PRIVATE")
-    if private_dir:
-        return Path(private_dir) / APP_FOLDER_NAME
-
-    home_dir = os.environ.get("HOME")
-    if home_dir:
-        return Path(home_dir) / APP_FOLDER_NAME
-
-    return Path.cwd() / APP_FOLDER_NAME
-
-
 def local_data_path():
-    if is_android():
-        return _android_data_path()
-
     if nameSO() == "Windows":
         roaming_app_data = os.environ.get("APPDATA")
         if roaming_app_data:
@@ -128,7 +89,10 @@ def compatibility_data_paths():
 
 
 def compatibility_installation_paths():
-    return _unique_paths([Path(path()), legacy_local_data_path()])
+    paths = [Path(path()), legacy_local_data_path()]
+    if nameSO() == "Windows":
+        paths.append(LEGACY_WINDOWS_INSTALL_ROOT / APP_FOLDER_NAME)
+    return _unique_paths(paths)
 
 
 def ensure_local_data_dir():
@@ -214,10 +178,6 @@ def migrate_legacy_data_files(filenames=None):
 
 
 def select_installation_directory(initial_path=None, parent=None):
-    if is_android():
-        # Android does not support tkinter folder picker in this project.
-        return str(local_data_path())
-
     from tkinter import filedialog
 
     initial_directory = initial_path or path()
