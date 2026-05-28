@@ -18,12 +18,18 @@ This creates 3 files in `packaging/winget/1.2.3/`:
 
 ## Publish to winget
 
-1. Fork `microsoft/winget-pkgs`
-2. Copy the generated files to the package path used by winget-pkgs
-3. Open a PR
+The GitHub Actions workflow publishes manifests to the forked package repository used by this project:
+
+`https://github.com/JLBBARCO/winget-pkgs`
+
+The generated files are copied into the package path expected by winget manifests and committed by the workflow.
 
 After merge, users can install with:
 
 ```powershell
 winget install JLBBARCO.PasswordsManager
 ```
+
+The generated manifests now target machine scope and set the install location to:
+
+`C:\File Programs (x86)\Passwords Manager`
