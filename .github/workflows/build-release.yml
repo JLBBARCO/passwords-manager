@@ -18,6 +18,7 @@ permissions:
 env:
   APP_NAME: Passwords Manager
   WINGET_REPOSITORY: JLBBARCO/winget-pkgs
+  WINGET_UPSTREAM_REPOSITORY: microsoft/winget-pkgs
   HOMEBREW_TAP_REPOSITORY: JLBBARCO/homebrew-tap
 
 jobs:
@@ -368,10 +369,21 @@ jobs:
           rm -rf winget-pkgs
           git clone "https://x-access-token:${WINGET_TOKEN}@github.com/${WINGET_REPOSITORY}.git" winget-pkgs
 
+      - name: Sync winget branch with upstream
+        shell: bash
+        env:
+          WINGET_BRANCH: winget-${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          cd winget-pkgs
+          git remote add upstream "https://github.com/${WINGET_UPSTREAM_REPOSITORY}.git"
+          git fetch upstream master
+          git checkout -B "${WINGET_BRANCH}" upstream/master
+
       - name: Publish Winget manifests
         shell: bash
         env:
           VERSION: ${{ needs.prepare-release-context.outputs.version }}
+          WINGET_BRANCH: winget-${{ needs.prepare-release-context.outputs.version }}
         run: |
           DEST_DIR="winget-pkgs/manifests/j/JLBBARCO/PasswordsManager/${VERSION}"
           mkdir -p "${DEST_DIR}"
@@ -384,7 +396,41 @@ jobs:
             exit 0
           fi
           git -C winget-pkgs commit -m "Publish Passwords Manager ${VERSION}"
-          git -C winget-pkgs push
+          git -C winget-pkgs push origin "${WINGET_BRANCH}"
+          echo "Created branch ${WINGET_BRANCH} in ${WINGET_REPOSITORY}. Open the PR against ${WINGET_UPSTREAM_REPOSITORY}:master."
+
+      - name: Open PR in upstream winget-pkgs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          VERSION: ${{ needs.prepare-release-context.outputs.version }}
+          WINGET_BRANCH: winget-${{ needs.prepare-release-context.outputs.version }}
+        run: |
+          PR_TITLE="New version: JLBBARCO.PasswordsManager ${VERSION}"
+          PR_BODY=$(cat <<EOF
+          Automated winget manifest update for JLBBARCO.PasswordsManager ${VERSION}.
+
+          This PR contains a single package version and includes:
+          - the version manifest
+          - the installer manifest
+          - the locale manifest
+
+          The branch was created from the latest upstream master to minimize merge conflicts.
+          EOF
+          )
+
+          existing_pr_url=$(gh pr list --repo "${WINGET_UPSTREAM_REPOSITORY}" --head "JLBBARCO:${WINGET_BRANCH}" --state open --json url -q '.[0].url' || true)
+          if [[ -n "${existing_pr_url}" ]]; then
+            echo "PR already exists: ${existing_pr_url}"
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "${WINGET_UPSTREAM_REPOSITORY}" \
+            --base master \
+            --head "JLBBARCO:${WINGET_BRANCH}" \
+            --title "${PR_TITLE}" \
+            --body "${PR_BODY}"
 
   publish-homebrew:
     if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
