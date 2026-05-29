@@ -70,7 +70,7 @@ $resolvedReleaseTag = Get-DefaultReleaseTag -InputVersion $Version -InputTag $Re
 $fixedInstallLocation = 'C:\File Programs (x86)\Passwords Manager'
 
 if (-not $InstallerUrl) {
-  $InstallerUrl = "https://github.com/JLBBARCO/passwords-manager/releases/download/$resolvedReleaseTag/install-passwords-manager.exe"
+  $InstallerUrl = "https://github.com/JLBBARCO/passwords-manager/releases/download/$resolvedReleaseTag/passwords-manager-windows-installer.exe"
 }
 
 Write-Host "Downloading installer to calculate SHA256..." -ForegroundColor Yellow
@@ -80,7 +80,7 @@ try {
   Download-InstallerWithRetry -Url $InstallerUrl -OutputFile $tempFile
 }
 catch {
-  Write-Error "Failed to download installer from '$InstallerUrl'. Verify that release/tag '$resolvedReleaseTag' exists and includes install-passwords-manager.exe."
+  Write-Error "Failed to download installer from '$InstallerUrl'. Verify that release/tag '$resolvedReleaseTag' exists and includes passwords-manager-windows-installer.exe."
   throw
 }
 
@@ -101,15 +101,15 @@ ManifestVersion: 1.6.0
 $installerManifest = @"
 PackageIdentifier: $PackageIdentifier
 PackageVersion: $Version
-InstallerType: exe
+InstallerType: inno
 Scope: machine
 InstallModes:
   - interactive
   - silent
 InstallerSwitches:
-  Silent: /S
-  SilentWithProgress: /S
-  Custom: /S /D="$fixedInstallLocation"
+  Silent: /VERYSILENT /NORESTART /SUPPRESSMSGBOXES
+  SilentWithProgress: /SILENT /NORESTART /SUPPRESSMSGBOXES
+  Custom: /VERYSILENT /NORESTART /SUPPRESSMSGBOXES /DIR="$fixedInstallLocation"
 InstallLocationRequired: true
 AppsAndFeaturesEntries:
   - DisplayName: Passwords Manager
