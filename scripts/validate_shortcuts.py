@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Validator script to check if shortcuts were created correctly on first run.
-Supports Windows (Start Menu + Desktop), Linux (.desktop files), and macOS (.command files).
+Supports Windows (Start Menu + Desktop).
 """
 
 import os
@@ -42,69 +42,6 @@ def validate_windows_shortcuts():
     return found_shortcuts, errors
 
 
-def validate_linux_shortcuts():
-    """Validate Linux .desktop files."""
-    app_dir = Path.home() / ".local" / "share" / "applications"
-    app_entry = app_dir / "passwords-manager.desktop"
-
-    errors = []
-    found_shortcuts = []
-
-    if not app_dir.exists():
-        errors.append(f"Applications directory not found: {app_dir}")
-        return found_shortcuts, errors
-
-    if app_entry.exists():
-        found_shortcuts.append(str(app_entry))
-
-        try:
-            content = app_entry.read_text(encoding="utf-8")
-            if "passwords-manager" in content:
-                found_shortcuts.append(f"{app_entry} (verified: contains executable reference)")
-            else:
-                errors.append(f"Desktop entry missing executable reference: {app_entry}")
-        except Exception as error:
-            errors.append(f"Failed to read desktop entry: {app_entry}: {error}")
-    else:
-        errors.append(f"Desktop entry not found: {app_entry}")
-
-    return found_shortcuts, errors
-
-
-def validate_macos_shortcuts():
-    """Validate macOS .command launcher files."""
-    app_dir = Path.home() / "Applications"
-    app_launcher = app_dir / "Passwords Manager.command"
-
-    errors = []
-    found_shortcuts = []
-
-    if not app_dir.exists():
-        errors.append(f"Applications directory not found: {app_dir}")
-        return found_shortcuts, errors
-
-    if app_launcher.exists():
-        found_shortcuts.append(str(app_launcher))
-
-        try:
-            content = app_launcher.read_text(encoding="utf-8")
-            if "passwords-manager" in content:
-                found_shortcuts.append(f"{app_launcher} (verified: contains executable reference)")
-            else:
-                errors.append(f"Launcher missing executable reference: {app_launcher}")
-
-            if os.access(app_launcher, os.X_OK):
-                found_shortcuts.append(f"{app_launcher} (verified: executable permission set)")
-            else:
-                errors.append(f"Launcher missing executable permission: {app_launcher}")
-        except Exception as error:
-            errors.append(f"Failed to read launcher: {app_launcher}: {error}")
-    else:
-        errors.append(f"Launcher not found: {app_launcher}")
-
-    return found_shortcuts, errors
-
-
 def main():
     """Main validation routine."""
     print("=" * 70)
@@ -118,16 +55,6 @@ def main():
     if os.name == "nt":
         print("Validating Windows shortcuts...")
         found, errors = validate_windows_shortcuts()
-        all_found.extend(found)
-        all_errors.extend(errors)
-    elif sys.platform.startswith("linux"):
-        print("Validating Linux shortcuts...")
-        found, errors = validate_linux_shortcuts()
-        all_found.extend(found)
-        all_errors.extend(errors)
-    elif sys.platform == "darwin":
-        print("Validating macOS shortcuts...")
-        found, errors = validate_macos_shortcuts()
         all_found.extend(found)
         all_errors.extend(errors)
     else:

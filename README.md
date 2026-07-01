@@ -123,39 +123,7 @@ Beta channel (published from `develop`):
 winget install JLBBARCO.PasswordsManager.Beta
 ```
 
-### Linux and macOS (script installer)
-
-Install directly from latest GitHub Release:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/install-unix.sh | bash
-```
-
-Uninstall:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/JLBBARCO/passwords-manager/main/scripts/uninstall-unix.sh | bash
-```
-
-### macOS and Linux (Homebrew tap alternative)
-
-This repository now includes a Homebrew formula template at `packaging/homebrew/passwords-manager.rb`.
-
-You can host it in your own tap and install with:
-
-```bash
-brew tap <your-org>/passwords-manager
-brew install passwords-manager
-```
-
-Beta channel formula (published from `develop`):
-
-```bash
-brew tap JLBBARCO/homebrew-tap
-brew install passwords-manager-beta
-```
-
-### � Pre-Compiled Executables
+### Pre-Compiled Executables
 
 Download the latest version compiled automatically:
 
@@ -166,10 +134,6 @@ Available for:
 - **Windows Installer**: `passwords-manager-windows-installer.exe`
 - **Windows helper**: `install-passwords-manager.exe`
 - **Windows portable**: `passwords-manager-windows.zip`
-- **macOS installer**: `passwords-manager-macos.dmg`
-- **macOS portable**: `passwords-manager-macos.tar.gz`
-- **Linux installer**: `passwords-manager-linux.AppImage`
-- **Linux portable**: `passwords-manager-linux.tar.gz`
 
 Executables are automatically compiled via GitHub Actions with each update.
 

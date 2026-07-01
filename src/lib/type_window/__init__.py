@@ -10,7 +10,7 @@ class TypeWindow(ctk.CTkToplevel):
         self.resizable(False, False)
         self.geometry('400x350')
         
-        # Melhor compatibilidade com Linux/macOS
+        # Mantém a janela em foco no Windows
         self.lift()
         self.attributes('-topmost', True)
         

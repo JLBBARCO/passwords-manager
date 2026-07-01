@@ -50,13 +50,7 @@ def generate_os_screenshot(os_name: str, output_file: Path) -> None:
     _draw_rounded_box(draw, panel, radius=7, fill=(42, 43, 48), outline=(57, 58, 64))
 
     # Simulate OS-specific title bar accents to keep images distinct by platform.
-    if os_label == "macos":
-        titlebar = (315, 18, 980, 52)
-        _draw_rounded_box(draw, titlebar, radius=7, fill=(52, 53, 60), outline=(67, 68, 74))
-        draw.ellipse((332, 30, 344, 42), fill=(255, 95, 87))
-        draw.ellipse((350, 30, 362, 42), fill=(254, 189, 46))
-        draw.ellipse((368, 30, 380, 42), fill=(40, 201, 64))
-    elif os_label == "windows":
+    if os_label == "windows":
         titlebar = (315, 18, 980, 52)
         _draw_rounded_box(draw, titlebar, radius=7, fill=(48, 50, 57), outline=(67, 68, 74))
         draw.text((910, 27), "_   □   X", fill=(190, 196, 204), font=_font(14))
@@ -142,7 +136,7 @@ def compose_thumbnail(input_files: Iterable[Path], output_file: Path) -> None:
             draw.line([(0, y), (width, y)], fill=(int(18 + ratio * 10), int(21 + ratio * 8), int(29 + ratio * 6)))
 
         caption_font = _font(22)
-        caption = "Passwords Manager - Multi-platform UI"
+        caption = "Passwords Manager - Windows UI"
         draw.text((padding, 8), caption, fill=(230, 236, 245), font=caption_font)
 
         x = padding

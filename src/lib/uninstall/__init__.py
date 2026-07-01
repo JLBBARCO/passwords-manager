@@ -118,37 +118,13 @@ def _delete_windows_uninstall_registry_key():
 	_delete_windows_registry_tree(winreg.HKEY_CURRENT_USER, subkey)
 
 
-def _remove_linux_integrations():
-	if os_name() != 'linux':
-		return
-
-	desktop_dir = Path.home() / '.local' / 'share' / 'applications'
-	(desktop_dir / 'passwords-manager.desktop').unlink(missing_ok=True)
-	(desktop_dir / 'passwords-manager-uninstall.desktop').unlink(missing_ok=True)
-
-
-def _remove_macos_integrations():
-	if os_name() != 'macos':
-		return
-
-	apps_dir = Path.home() / 'Applications'
-	(apps_dir / 'Passwords Manager.command').unlink(missing_ok=True)
-	(apps_dir / 'Uninstall Passwords Manager.command').unlink(missing_ok=True)
-
-
 def _remove_platform_integrations():
 	_remove_windows_integrations()
-	_remove_linux_integrations()
-	_remove_macos_integrations()
 
 
 def os_name():
 	if sys.platform.startswith('win'):
 		return 'windows'
-	if sys.platform.startswith('linux'):
-		return 'linux'
-	if sys.platform == 'darwin':
-		return 'macos'
 	return 'other'
 
 

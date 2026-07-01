@@ -247,12 +247,6 @@ class App(ctk.CTk):
             subprocess.Popen(['winget', 'upgrade', 'JLBBARCO.PasswordsManager'])
             return 'winget'
 
-        if system_name in ('Darwin', 'Linux'):
-            if not shutil.which('brew'):
-                raise RuntimeError('Homebrew não encontrado neste sistema.')
-            subprocess.Popen(['brew', 'upgrade', 'passwords-manager'])
-            return 'brew'
-
         raise RuntimeError(f'Sistema não suportado para atualização automática: {system_name}')
 
     def check_updates_and_prompt(self):

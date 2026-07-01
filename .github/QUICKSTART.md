@@ -58,8 +58,6 @@ build.bat
 
 2. Download:
    - **Windows**: `passwords-manager-windows-installer.exe` or `passwords-manager-windows.zip`
-   - **Linux**: `passwords-manager-linux.tar.gz`
-   - **macOS**: `passwords-manager-macos.tar.gz`
 
 3. Extract and run!
 

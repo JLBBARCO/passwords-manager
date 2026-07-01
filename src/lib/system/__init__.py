@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 APP_FOLDER_NAME = "Passwords Manager"
-WINDOWS_INSTALL_ROOT = Path("C:/File Programs (x86)")
+WINDOWS_INSTALL_ROOT = Path(r"C:/Program Files (x86)")
 LEGACY_WINDOWS_INSTALL_ROOT = Path("C:/File Programs")
 DATA_FILENAMES = (
     "passwords.json",
@@ -28,10 +28,6 @@ def nameSO():
 
     if system == "Windows":
         return "Windows"
-    elif system == "Darwin":
-        return "MacOS"
-    elif system == "Linux":
-        return "Linux"
     else:
         return "Unknown"
 
@@ -48,14 +44,10 @@ def _unique_paths(paths):
 
 
 def path():
-    name = nameSO()
-
-    if name == "Windows":
+    if nameSO() == "Windows":
         return str(WINDOWS_INSTALL_ROOT / APP_FOLDER_NAME)
-    elif name == "Linux" or name == "MacOS":
-        return "/usr/local/Passwords Manager"
-    else:
-        return "Unknown"
+
+    return "Unknown"
 
 
 def local_data_path():
@@ -64,12 +56,6 @@ def local_data_path():
         if roaming_app_data:
             return Path(roaming_app_data) / APP_FOLDER_NAME
         return Path.home() / "AppData" / "Roaming" / APP_FOLDER_NAME
-
-    if nameSO() == "Linux":
-        return Path.home() / ".local" / "share" / APP_FOLDER_NAME
-
-    if nameSO() == "MacOS":
-        return Path.home() / "Library" / "Application Support" / APP_FOLDER_NAME
 
     return Path.cwd() / APP_FOLDER_NAME
 

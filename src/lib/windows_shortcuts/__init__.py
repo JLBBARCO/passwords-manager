@@ -77,11 +77,20 @@ def create_windows_shortcut(shortcut_path, target_exe, working_dir, description,
         script_file.close()
         script_path = Path(script_file.name)
 
+        startupinfo = None
+        creationflags = 0
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            creationflags = subprocess.CREATE_NO_WINDOW
+
         result = subprocess.run(
             ['cscript.exe', '//NoLogo', str(script_path)],
             capture_output=True,
             text=True,
             check=False,
+            startupinfo=startupinfo,
+            creationflags=creationflags,
         )
     finally:
         if script_file is not None and not script_file.closed:

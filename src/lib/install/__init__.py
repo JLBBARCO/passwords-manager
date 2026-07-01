@@ -1,7 +1,6 @@
 import customtkinter as ctk
 from src.lib.system import (
 	DATA_FILENAMES,
-	compatibility_installation_paths,
 	local_data_path,
 	migrate_legacy_data_files,
 	path as system_path,
@@ -32,6 +31,18 @@ program_name = 'Install Passwords Manager'
 installation_path = system_path()
 GITHUB_RELEASES_LATEST_API = 'https://api.github.com/repos/JLBBARCO/passwords-manager/releases/latest'
 WINDOWS_RELEASE_ARCHIVE_NAME = 'passwords-manager-windows.zip'
+
+
+def _hidden_subprocess_kwargs():
+	if os.name != 'nt':
+		return {}
+
+	startupinfo = subprocess.STARTUPINFO()
+	startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+	return {
+		'startupinfo': startupinfo,
+		'creationflags': subprocess.CREATE_NO_WINDOW,
+	}
 
 
 class Install(ctk.CTk):
@@ -143,15 +154,7 @@ class Install(ctk.CTk):
 		return self._workspace_root()
 
 	def _resolve_destination(self):
-		if os.name == 'nt':
-			return Path(system_path())
-
-		selected_path = Path(self.installation_path).expanduser()
-
-		if selected_path.name.lower() != 'passwords manager':
-			selected_path = selected_path / 'Passwords Manager'
-
-		return selected_path
+		return Path(system_path())
 
 	def _fallback_destination(self):
 		return Path(system_path())
@@ -330,6 +333,7 @@ class Install(ctk.CTk):
 				stderr=subprocess.STDOUT,
 				text=True,
 				errors='replace',
+				**_hidden_subprocess_kwargs(),
 			)
 
 			if process.stdout is not None:
@@ -577,85 +581,11 @@ class Install(ctk.CTk):
 
 		return f'HKCU\\{subkey}'
 
-	def _linux_shortcut_dir(self):
-		return Path.home() / '.local' / 'share' / 'applications'
-
-	def _create_linux_desktop_shortcuts(self, destination):
-		desktop_dir = self._linux_shortcut_dir()
-		desktop_dir.mkdir(parents=True, exist_ok=True)
-
-		app_exec = Path(destination) / 'passwords-manager'
-		uninstall_exec = Path(destination) / 'uninstall' / 'uninstall.sh'
-
-		if not app_exec.exists():
-			return []
-
-		app_entry = desktop_dir / 'passwords-manager.desktop'
-		uninstall_entry = desktop_dir / 'passwords-manager-uninstall.desktop'
-
-		app_content = (
-			'[Desktop Entry]\n'
-			'Type=Application\n'
-			'Version=1.0\n'
-			'Name=Passwords Manager\n'
-			f'Exec="{app_exec}"\n'
-			'Terminal=false\n'
-			'Categories=Utility;Security;\n'
-		)
-
-		app_entry.write_text(app_content, encoding='utf-8')
-		created = [str(app_entry)]
-
-		if uninstall_exec.exists():
-			uninstall_content = (
-				'[Desktop Entry]\n'
-				'Type=Application\n'
-				'Version=1.0\n'
-				'Name=Uninstall Passwords Manager\n'
-				f'Exec="{uninstall_exec}"\n'
-				'Terminal=true\n'
-				'Categories=Utility;\n'
-			)
-			uninstall_entry.write_text(uninstall_content, encoding='utf-8')
-			created.append(str(uninstall_entry))
-
-		return created
-
-	def _create_macos_shortcuts(self, destination):
-		apps_dir = Path.home() / 'Applications'
-		apps_dir.mkdir(parents=True, exist_ok=True)
-
-		app_exec = Path(destination) / 'passwords-manager'
-		uninstall_exec = Path(destination) / 'uninstall' / 'uninstall.sh'
-
-		if not app_exec.exists():
-			return []
-
-		app_launcher = apps_dir / 'Passwords Manager.command'
-		app_launcher.write_text(f'#!/bin/bash\n"{app_exec}"\n', encoding='utf-8')
-		app_launcher.chmod(0o755)
-
-		created = [str(app_launcher)]
-
-		if uninstall_exec.exists():
-			uninstall_launcher = apps_dir / 'Uninstall Passwords Manager.command'
-			uninstall_launcher.write_text(f'#!/bin/bash\n"{uninstall_exec}"\n', encoding='utf-8')
-			uninstall_launcher.chmod(0o755)
-			created.append(str(uninstall_launcher))
-
-		return created
-
 	def _create_platform_shortcuts(self, destination):
 		if os.name == 'nt':
 			start_menu_shortcuts = self._create_start_menu_shortcuts(destination)
 			desktop_shortcuts = self._create_desktop_shortcuts(destination)
 			return start_menu_shortcuts + desktop_shortcuts
-
-		if sys.platform.startswith('linux'):
-			return self._create_linux_desktop_shortcuts(destination)
-
-		if sys.platform == 'darwin':
-			return self._create_macos_shortcuts(destination)
 
 		return []
 
@@ -838,11 +768,7 @@ class Install(ctk.CTk):
 			os.startfile(path_str)
 			return
 
-		if sys.platform == 'darwin':
-			subprocess.run(['open', path_str], check=False)
-			return
-
-		subprocess.run(['xdg-open', path_str], check=False)
+		subprocess.run(['explorer', path_str], check=False)
 
 	def cancel(self):
 		if self.installing:

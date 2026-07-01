@@ -19,7 +19,6 @@ env:
   APP_NAME: Passwords Manager
   WINGET_REPOSITORY: JLBBARCO/winget-pkgs
   WINGET_UPSTREAM_REPOSITORY: microsoft/winget-pkgs
-  HOMEBREW_TAP_REPOSITORY: JLBBARCO/homebrew-tap
 
 jobs:
   prepare-release-context:
@@ -132,129 +131,11 @@ jobs:
             release-assets/passwords-manager-windows.zip
             release-assets/windows.webp
 
-  build-macos:
-    if: github.actor != 'github-actions[bot]'
-    needs: [prepare-release-context]
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install build dependencies
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
-          brew update
-          brew install create-dmg
-
-      - name: Build macOS binaries
-        shell: bash
-        env:
-          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
-        run: |
-          mkdir -p release-assets
-          python -m PyInstaller --noconfirm --onefile --name passwords-manager main.py
-          python -m PyInstaller --noconfirm --windowed --name "Passwords Manager" main.py
-          cp dist/passwords-manager release-assets/passwords-manager
-          tar -czf release-assets/passwords-manager-macos.tar.gz -C dist passwords-manager
-
-      - name: Package macOS disk image
-        shell: bash
-        run: |
-          rm -f release-assets/passwords-manager-macos.dmg
-          create-dmg \
-            --volname "Passwords Manager" \
-            --window-size 540 380 \
-            --icon-size 128 \
-            --app-drop-link 380 190 \
-            "release-assets/passwords-manager-macos.dmg" \
-            "dist/Passwords Manager.app"
-
-      - name: Render macOS screenshot
-        shell: bash
-        run: |
-          python scripts/generate_screenshots.py --os macos --output "release-assets/macos.webp"
-
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-release-assets
-          path: |
-            release-assets/passwords-manager-macos.tar.gz
-            release-assets/passwords-manager-macos.dmg
-            release-assets/macos.webp
-
-  build-linux:
-    if: github.actor != 'github-actions[bot]'
-    needs: [prepare-release-context]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install build dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fuse libfuse2 desktop-file-utils patchelf xvfb
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
-
-      - name: Build Linux binary
-        shell: bash
-        env:
-          PASSWORDS_MANAGER_VERSION: ${{ needs.prepare-release-context.outputs.version }}
-        run: |
-          mkdir -p release-assets/AppDir/usr/bin release-assets/AppDir/usr/share/applications release-assets/AppDir/usr/share/icons/hicolor/256x256/apps
-          python -m PyInstaller --noconfirm --onefile --name passwords-manager main.py
-          cp dist/passwords-manager release-assets/passwords-manager
-          tar -czf release-assets/passwords-manager-linux.tar.gz -C dist passwords-manager
-          cp dist/passwords-manager release-assets/AppDir/usr/bin/passwords-manager
-          chmod +x release-assets/AppDir/usr/bin/passwords-manager
-          python -c "from PIL import Image; Image.open('src/assets/icon/passwords-manager.ico').save('release-assets/AppDir/usr/share/icons/hicolor/256x256/apps/passwords-manager.png')"
-          cat > release-assets/AppDir/passwords-manager.desktop <<'EOF'
-          [Desktop Entry]
-          Type=Application
-          Name=Passwords Manager
-          Exec=passwords-manager
-          Icon=passwords-manager
-          Categories=Utility;Security;
-          Terminal=false
-          EOF
-          cp release-assets/AppDir/passwords-manager.desktop release-assets/AppDir/usr/share/applications/passwords-manager.desktop
-          cat > release-assets/AppDir/AppRun <<'EOF'
-          #!/bin/sh
-          HERE="$(dirname "$(readlink -f "$0")")"
-          exec "$HERE/usr/bin/passwords-manager" "$@"
-          EOF
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-release-assets
-          path: |
-            release-assets/passwords-manager-linux.tar.gz
-            release-assets/passwords-manager-linux.AppImage
-            release-assets/linux.webp
-
   create-release:
     if: github.actor != 'github-actions[bot]'
     needs:
       - prepare-release-context
       - build-windows
-      - build-macos
-      - build-linux
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.release.outputs.release_tag }}
@@ -276,7 +157,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-package
-          find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release-package/ \;
+          find release-assets -type f \( -name '*.exe' -o -name '*.zip' \) -exec cp {} release-package/ \;
           sha256sum release-package/* > release-package/SHA256SUMS.txt
           cat release-package/SHA256SUMS.txt
 
@@ -432,96 +313,9 @@ jobs:
             --title "${PR_TITLE}" \
             --body "${PR_BODY}"
 
-  publish-homebrew:
-    if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/main'
-    needs: [prepare-release-context, create-release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Verify Homebrew token
-        shell: bash
-        env:
-          HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
-        run: |
-          if [[ -z "${HOMEBREW_TOKEN}" ]]; then
-            echo "HOMEBREW_TOKEN secret is required to publish to ${HOMEBREW_TAP_REPOSITORY}." >&2
-            exit 1
-          fi
-
-      - name: Download release package
-        uses: actions/download-artifact@v4
-        with:
-          name: release-package
-          path: release-package
-
-      - name: Clone Homebrew tap
-        shell: bash
-        env:
-          HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
-        run: |
-          rm -rf homebrew-tap
-          git clone "https://x-access-token:${HOMEBREW_TOKEN}@github.com/${HOMEBREW_TAP_REPOSITORY}.git" homebrew-tap
-
-      - name: Render Homebrew formula
-        shell: bash
-        env:
-          VERSION: ${{ needs.prepare-release-context.outputs.version }}
-          RELEASE_DOWNLOAD_BASE: ${{ needs.prepare-release-context.outputs.release_download_base }}
-        run: |
-          if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
-            FORMULA_FILE="passwords-manager-beta.rb"
-            FORMULA_CLASS="PasswordsManagerBeta"
-          else
-            FORMULA_FILE="passwords-manager.rb"
-            FORMULA_CLASS="PasswordsManager"
-          fi
-
-          mkdir -p homebrew-tap/Formula
-          MAC_SHA=$(grep 'passwords-manager-macos.tar.gz' release-package/SHA256SUMS.txt | awk '{print $1}')
-          LINUX_SHA=$(grep 'passwords-manager-linux.tar.gz' release-package/SHA256SUMS.txt | awk '{print $1}')
-
-          cat > "homebrew-tap/Formula/${FORMULA_FILE}" <<EOF
-          class ${FORMULA_CLASS} < Formula
-            desc "Password manager with encrypted local storage"
-            homepage "https://github.com/JLBBARCO/passwords-manager"
-            version "${VERSION}"
-
-            on_macos do
-              url "${RELEASE_DOWNLOAD_BASE}/passwords-manager-macos.tar.gz"
-              sha256 "${MAC_SHA}"
-            end
-
-            on_linux do
-              url "${RELEASE_DOWNLOAD_BASE}/passwords-manager-linux.tar.gz"
-              sha256 "${LINUX_SHA}"
-            end
-
-            def install
-              bin.install "passwords-manager"
-            end
-          end
-          EOF
-
-      - name: Publish Homebrew formula
-        shell: bash
-        env:
-          VERSION: ${{ needs.prepare-release-context.outputs.version }}
-        run: |
-          git -C homebrew-tap config user.name "github-actions[bot]"
-          git -C homebrew-tap config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C homebrew-tap add Formula/*.rb
-          if git -C homebrew-tap diff --cached --quiet; then
-            echo "No Homebrew changes to publish."
-            exit 0
-          fi
-          git -C homebrew-tap commit -m "Publish Passwords Manager ${VERSION}"
-          git -C homebrew-tap push
-
   refresh-screenshots:
     if: github.actor != 'github-actions[bot]'
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -546,21 +340,19 @@ jobs:
         shell: bash
         run: |
           mkdir -p src/assets/screenshot src/assets/img
-          for f in windows macos linux; do
-            if [ -f "release-assets/${f}.webp" ]; then
-              cp "release-assets/${f}.webp" "src/assets/screenshot/${f}.webp"
-            else
-              echo "warning: release-assets/${f}.webp not found, skipping"
-            fi
-          done
-          python scripts/generate_screenshots.py --compose-thumbnail --output src/assets/img/thumbnail.webp --inputs src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp
+          if [ -f "release-assets/windows.webp" ]; then
+            cp "release-assets/windows.webp" "src/assets/screenshot/windows.webp"
+          else
+            echo "warning: release-assets/windows.webp not found, skipping"
+          fi
+          python scripts/generate_screenshots.py --compose-thumbnail --output src/assets/img/thumbnail.webp --inputs src/assets/screenshot/windows.webp
 
       - name: Commit screenshot refresh
         shell: bash
         run: |
           git config user.name "github-copilot[bot]"
           git config user.email "github-copilot[bot]@users.noreply.github.com"
-          git add src/assets/screenshot/windows.webp src/assets/screenshot/macos.webp src/assets/screenshot/linux.webp src/assets/img/thumbnail.webp
+          git add src/assets/screenshot/windows.webp src/assets/img/thumbnail.webp
           if git diff --cached --quiet; then
             echo "No screenshot updates to commit."
             exit 0

@@ -67,7 +67,7 @@ catch {
 }
 
 $resolvedReleaseTag = Get-DefaultReleaseTag -InputVersion $Version -InputTag $ReleaseTag
-$fixedInstallLocation = 'C:\File Programs (x86)\Passwords Manager'
+$fixedInstallLocation = 'C:\Program Files (x86)\Passwords Manager'
 
 if (-not $InstallerUrl) {
   $InstallerUrl = "https://github.com/JLBBARCO/passwords-manager/releases/download/$resolvedReleaseTag/passwords-manager-windows-installer.exe"
