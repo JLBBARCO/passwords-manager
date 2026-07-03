@@ -10,7 +10,7 @@ The workflow:
 2. Packages the Windows installers
 3. Creates a GitHub Release
 4. Computes SHA-256 hashes for the release assets
-5. Publishes to WinGet and Homebrew
+5. Publishes to WinGet
 6. Refreshes the screenshot assets and commits them back to the repository
 
 ## Branch Behavior

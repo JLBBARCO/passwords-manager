@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from src.lib.system import (
 	DATA_FILENAMES,
+	compatibility_installation_paths,
 	local_data_path,
 	migrate_legacy_data_files,
 	path as system_path,
